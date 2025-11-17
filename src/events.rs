@@ -195,8 +195,14 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Resu
         }
 
         // Sort menu
-        (KeyCode::Char('o'), KeyModifiers::NONE) => {
+        (KeyCode::Char('s'), KeyModifiers::NONE) => {
             app.mode = Mode::SortMenu;
+        }
+
+        // Toggle sort order
+        (KeyCode::Char('o'), KeyModifiers::NONE) => {
+            app.sort_ascending = !app.sort_ascending;
+            app.sort_files();
         }
 
         // Create file/folder

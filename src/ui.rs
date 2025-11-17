@@ -172,11 +172,13 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
 
     let footer_text = match app.mode {
         Mode::Normal => {
-            let sort_info = match app.sort_mode {
+            let sort_name = match app.sort_mode {
                 SortMode::Name => "Name",
                 SortMode::Size => "Size",
                 SortMode::Modified => "Modified",
             };
+            let sort_order = if app.sort_ascending { "↑" } else { "↓" };
+            let sort_info = format!("{} {}", sort_name, sort_order);
 
             let right_info = match &app.clipboard {
                 ClipboardOperation::Copy(paths) => format!("Sort: {} | Copied: {}", sort_info, paths.len()),
@@ -277,7 +279,8 @@ fn render_help(frame: &mut Frame, app: &App, area: Rect) {
             Line::from(" Other:"),
             Line::from("   /       - Search (fuzzy)"),
             Line::from("   .       - Toggle hidden files"),
-            Line::from("   o       - Sort menu"),
+            Line::from("   s       - Sort menu"),
+            Line::from("   o       - Toggle sort order (↑/↓)"),
             Line::from("   d       - Delete file/folder"),
             Line::from("   ?       - Show this help"),
             Line::from("   q       - Quit"),

@@ -52,6 +52,7 @@ pub struct App {
     pub mode: Mode,
     pub show_hidden: bool,
     pub sort_mode: SortMode,
+    pub sort_ascending: bool,
     pub search_query: String,
     pub create_input: String,
     pub filtered_indices: Vec<usize>,
@@ -82,6 +83,7 @@ impl App {
             mode: Mode::Normal,
             show_hidden,
             sort_mode,
+            sort_ascending: true,
             search_query: String::new(),
             create_input: String::new(),
             filtered_indices: Vec::new(),
@@ -149,20 +151,37 @@ impl App {
         // Sort each group
         match self.sort_mode {
             SortMode::Name => {
-                dirs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-                files.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                if self.sort_ascending {
+                    dirs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                    files.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                } else {
+                    dirs.sort_by(|a, b| b.name.to_lowercase().cmp(&a.name.to_lowercase()));
+                    files.sort_by(|a, b| b.name.to_lowercase().cmp(&a.name.to_lowercase()));
+                }
             }
             SortMode::Size => {
                 dirs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-                files.sort_by(|a, b| b.size.cmp(&a.size));
+                if self.sort_ascending {
+                    files.sort_by(|a, b| a.size.cmp(&b.size));
+                } else {
+                    files.sort_by(|a, b| b.size.cmp(&a.size));
+                }
             }
             SortMode::Modified => {
                 dirs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-                files.sort_by(|a, b| {
-                    b.modified
-                        .unwrap_or(SystemTime::UNIX_EPOCH)
-                        .cmp(&a.modified.unwrap_or(SystemTime::UNIX_EPOCH))
-                });
+                if self.sort_ascending {
+                    files.sort_by(|a, b| {
+                        a.modified
+                            .unwrap_or(SystemTime::UNIX_EPOCH)
+                            .cmp(&b.modified.unwrap_or(SystemTime::UNIX_EPOCH))
+                    });
+                } else {
+                    files.sort_by(|a, b| {
+                        b.modified
+                            .unwrap_or(SystemTime::UNIX_EPOCH)
+                            .cmp(&a.modified.unwrap_or(SystemTime::UNIX_EPOCH))
+                    });
+                }
             }
         }
 
