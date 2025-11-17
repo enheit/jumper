@@ -2,6 +2,8 @@
 
 A blazing fast terminal file manager with vim-like keybindings, built with Rust and Ratatui.
 
+[![asciicast](https://asciinema.org/a/CVTB8IvYoKMw0OLqmzcmpuRh0.svg)](https://asciinema.org/a/CVTB8IvYoKMw0OLqmzcmpuRh0)
+
 ## Features
 
 - **Vim-like Navigation**: Navigate with hjkl or arrow keys
