@@ -63,6 +63,12 @@ fn create_list_item<'a>(file: &'a FileEntry, is_selected: bool, app: &App) -> Li
         ""
     };
 
+    // Check if file is in cut clipboard
+    let is_cut = match &app.clipboard {
+        ClipboardOperation::Cut(paths) => paths.contains(&file.path),
+        _ => false,
+    };
+
     let color = if file.is_hidden {
         app.config.colors.hidden
     } else if file.is_dir {
@@ -76,6 +82,12 @@ fn create_list_item<'a>(file: &'a FileEntry, is_selected: bool, app: &App) -> Li
     };
 
     let mut style = Style::default().fg(color);
+
+    // Add italic for cut files
+    if is_cut {
+        style = style.add_modifier(Modifier::ITALIC);
+    }
+
     if is_selected {
         style = style.add_modifier(Modifier::REVERSED);
     }
@@ -129,11 +141,31 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         ),
         Mode::Create => format!("Create (end with / for folder): {}", app.create_input),
         Mode::Help => String::from("Press ESC or ? to close help"),
+        Mode::DeleteConfirm => {
+            if let Some(path) = &app.delete_target {
+                format!("Delete {}? [y/n]", path.file_name().unwrap_or_default().to_string_lossy())
+            } else {
+                String::from("Delete? [y/n]")
+            }
+        }
     };
 
-    let footer = Paragraph::new(footer_text)
+    // Add flash notification if present
+    let final_text = if let Some(notification) = &app.flash_notification {
+        format!("{} | {}", footer_text, notification)
+    } else {
+        footer_text
+    };
+
+    let footer_style = if app.flash_notification.is_some() {
+        Style::default().fg(ratatui::style::Color::Yellow).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+
+    let footer = Paragraph::new(final_text)
         .block(Block::default().borders(Borders::NONE))
-        .style(Style::default());
+        .style(footer_style);
 
     frame.render_widget(footer, area);
 }
@@ -164,6 +196,7 @@ fn render_help(frame: &mut Frame, app: &App, area: Rect) {
             Line::from("   /       - Search (fuzzy)"),
             Line::from("   .       - Toggle hidden files"),
             Line::from("   o       - Sort menu"),
+            Line::from("   d       - Delete file/folder"),
             Line::from("   ?       - Show this help"),
             Line::from("   q       - Quit"),
             Line::from(""),

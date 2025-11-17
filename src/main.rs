@@ -56,8 +56,22 @@ async fn run_app<B: ratatui::backend::Backend>(
     app: &mut App,
 ) -> Result<()> {
     let mut render_interval = interval(Duration::from_millis(16)); // ~60 FPS
+    let mut flash_timer: Option<tokio::time::Instant> = None;
 
     loop {
+        // Clear flash notification after timeout
+        if let Some(timer) = flash_timer {
+            if timer.elapsed() >= Duration::from_millis(800) {
+                app.flash_notification = None;
+                flash_timer = None;
+            }
+        }
+
+        // Set timer when flash notification is shown
+        if app.flash_notification.is_some() && flash_timer.is_none() {
+            flash_timer = Some(tokio::time::Instant::now());
+        }
+
         // Draw UI
         terminal.draw(|f| ui::render_ui(f, app))?;
 

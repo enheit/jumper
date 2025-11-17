@@ -21,6 +21,7 @@ pub async fn handle_key_event(app: &mut App, key: KeyEvent) -> Result<()> {
         Mode::SortMenu => handle_sort_menu(app, key)?,
         Mode::Create => handle_create_mode(app, key)?,
         Mode::Help => handle_help_mode(app, key)?,
+        Mode::DeleteConfirm => handle_delete_confirm_mode(app, key)?,
     }
 
     // Update last key
@@ -90,6 +91,7 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Resu
             if app.last_key == "y" {
                 if let Some(path) = app.get_selected_path() {
                     app.clipboard = ClipboardOperation::Copy(vec![path]);
+                    app.flash_notification = Some("Copied".to_string());
                 }
                 app.last_key.clear();
             }
@@ -125,8 +127,21 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Resu
             app.create_input.clear();
         }
 
+        // Delete
+        (KeyCode::Char('d'), KeyModifiers::NONE) => {
+            if let Some(path) = app.get_selected_path() {
+                if app.config.behavior.delete_confirmation {
+                    app.delete_target = Some(path);
+                    app.mode = Mode::DeleteConfirm;
+                } else {
+                    crate::file_ops::delete_path(&path)?;
+                    app.load_directory()?;
+                }
+            }
+        }
+
         // Help
-        (KeyCode::Char('?'), KeyModifiers::SHIFT) => {
+        (KeyCode::Char('?'), _) => {
             app.mode = Mode::Help;
         }
 
@@ -156,7 +171,9 @@ fn handle_visual_mode(app: &mut App, key: KeyEvent) -> Result<()> {
                 .filter_map(|&i| app.files.get(i).map(|f| f.path.clone()))
                 .collect();
             if !paths.is_empty() {
+                let count = paths.len();
                 app.clipboard = ClipboardOperation::Copy(paths);
+                app.flash_notification = Some(format!("Copied {} items", count));
             }
             app.mode = Mode::Normal;
             app.selected_indices.clear();
@@ -210,7 +227,9 @@ fn handle_visual_multi_mode(app: &mut App, key: KeyEvent) -> Result<()> {
                 .filter_map(|&i| app.files.get(i).map(|f| f.path.clone()))
                 .collect();
             if !paths.is_empty() {
+                let count = paths.len();
                 app.clipboard = ClipboardOperation::Copy(paths);
+                app.flash_notification = Some(format!("Copied {} items", count));
             }
             app.mode = Mode::Normal;
             app.selected_indices.clear();
@@ -322,6 +341,25 @@ fn handle_create_mode(app: &mut App, key: KeyEvent) -> Result<()> {
 fn handle_help_mode(app: &mut App, key: KeyEvent) -> Result<()> {
     match key.code {
         KeyCode::Esc | KeyCode::Char('?') => {
+            app.mode = Mode::Normal;
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn handle_delete_confirm_mode(app: &mut App, key: KeyEvent) -> Result<()> {
+    match key.code {
+        KeyCode::Char('y') | KeyCode::Char('Y') => {
+            if let Some(path) = app.delete_target.take() {
+                crate::file_ops::delete_path(&path)?;
+                app.load_directory()?;
+            }
+            app.mode = Mode::Normal;
+        }
+        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+            app.delete_target = None;
             app.mode = Mode::Normal;
         }
         _ => {}

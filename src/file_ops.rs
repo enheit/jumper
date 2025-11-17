@@ -77,3 +77,12 @@ pub fn create_directory(path: &Path) -> Result<()> {
     fs::create_dir_all(path)?;
     Ok(())
 }
+
+pub fn delete_path(path: &Path) -> Result<()> {
+    if path.is_dir() {
+        fs::remove_dir_all(path)?;
+    } else {
+        fs::remove_file(path)?;
+    }
+    Ok(())
+}

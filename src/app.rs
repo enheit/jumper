@@ -34,6 +34,7 @@ pub enum Mode {
     SortMenu,
     Create,
     Help,
+    DeleteConfirm,
 }
 
 #[derive(Debug, Clone)]
@@ -58,6 +59,8 @@ pub struct App {
     pub config: Config,
     pub last_key: String,
     pub nav_history: Vec<NavigationHistory>,
+    pub flash_notification: Option<String>,
+    pub delete_target: Option<PathBuf>,
 }
 
 impl App {
@@ -82,6 +85,8 @@ impl App {
             config,
             last_key: String::new(),
             nav_history: Vec::new(),
+            flash_notification: None,
+            delete_target: None,
         };
 
         app.load_directory()?;
@@ -182,7 +187,7 @@ impl App {
         let i = match self.list_state.selected() {
             Some(i) => {
                 if i >= filtered_count - 1 {
-                    0
+                    filtered_count - 1 // Stay at bottom
                 } else {
                     i + 1
                 }
@@ -201,7 +206,7 @@ impl App {
         let i = match self.list_state.selected() {
             Some(i) => {
                 if i == 0 {
-                    filtered_count - 1
+                    0 // Stay at top
                 } else {
                     i - 1
                 }

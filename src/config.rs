@@ -44,6 +44,8 @@ pub struct Behavior {
     pub show_hidden: bool,
     #[serde(default = "default_sort")]
     pub default_sort: SortMode,
+    #[serde(default = "default_delete_confirmation")]
+    pub delete_confirmation: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
@@ -83,6 +85,10 @@ fn default_sort() -> SortMode {
     SortMode::Name
 }
 
+fn default_delete_confirmation() -> bool {
+    true
+}
+
 impl Default for ColorScheme {
     fn default() -> Self {
         Self {
@@ -119,6 +125,7 @@ impl Default for Behavior {
         Self {
             show_hidden: false,
             default_sort: default_sort(),
+            delete_confirmation: default_delete_confirmation(),
         }
     }
 }
