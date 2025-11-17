@@ -1,0 +1,282 @@
+use crate::app::{App, ClipboardOperation, Mode};
+use crate::config::SortMode;
+use anyhow::Result;
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+
+pub async fn handle_key_event(app: &mut App, key: KeyEvent) -> Result<()> {
+    // Only handle Press events for consistency across platforms
+    if key.kind != KeyEventKind::Press {
+        return Ok(());
+    }
+
+    // Store last key for multi-key bindings
+    let current_key = format_key(&key);
+    let two_key_combo = format!("{}{}", app.last_key, current_key);
+
+    match app.mode {
+        Mode::Normal => handle_normal_mode(app, key, &two_key_combo)?,
+        Mode::Visual => handle_visual_mode(app, key)?,
+        Mode::VisualMulti => handle_visual_multi_mode(app, key)?,
+        Mode::Search => handle_search_mode(app, key)?,
+        Mode::SortMenu => handle_sort_menu(app, key)?,
+    }
+
+    // Update last key
+    app.last_key = current_key;
+
+    Ok(())
+}
+
+fn handle_normal_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Result<()> {
+    // Handle quick jumps (two-key combinations)
+    if let Some(path) = app.config.keybindings.quick_jumps.get(two_key_combo) {
+        app.current_dir = std::path::PathBuf::from(path);
+        app.load_directory()?;
+        app.list_state.select(Some(0));
+        app.last_key.clear();
+        return Ok(());
+    }
+
+    match (key.code, key.modifiers) {
+        // Quit
+        (KeyCode::Char('q'), KeyModifiers::NONE) => {
+            app.should_quit = true;
+        }
+
+        // Navigation
+        (KeyCode::Char('j'), KeyModifiers::NONE) | (KeyCode::Down, _) => {
+            app.next();
+        }
+        (KeyCode::Char('k'), KeyModifiers::NONE) | (KeyCode::Up, _) => {
+            app.previous();
+        }
+        (KeyCode::Char('l'), KeyModifiers::NONE) | (KeyCode::Right, _) => {
+            if let Some(path) = app.get_selected_path() {
+                if path.is_dir() {
+                    app.enter_directory()?;
+                } else {
+                    // Open file with default application
+                    crate::file_ops::open_file(&path)?;
+                }
+            }
+        }
+        (KeyCode::Char('h'), KeyModifiers::NONE) | (KeyCode::Left, _) => {
+            app.go_parent()?;
+        }
+
+        // Toggle hidden files
+        (KeyCode::Char('.'), KeyModifiers::NONE) => {
+            app.toggle_hidden()?;
+        }
+
+        // Visual mode
+        (KeyCode::Char('v'), KeyModifiers::NONE) => {
+            app.mode = Mode::Visual;
+            if let Some(selected) = app.list_state.selected() {
+                app.selected_indices = vec![selected];
+            }
+        }
+        (KeyCode::Char('V'), KeyModifiers::SHIFT) => {
+            app.mode = Mode::VisualMulti;
+            if let Some(selected) = app.list_state.selected() {
+                app.selected_indices = vec![selected];
+            }
+        }
+
+        // Copy (yy)
+        (KeyCode::Char('y'), KeyModifiers::NONE) => {
+            if app.last_key == "y" {
+                if let Some(path) = app.get_selected_path() {
+                    app.clipboard = ClipboardOperation::Copy(vec![path]);
+                }
+                app.last_key.clear();
+            }
+        }
+
+        // Cut
+        (KeyCode::Char('x'), KeyModifiers::NONE) => {
+            if let Some(path) = app.get_selected_path() {
+                app.clipboard = ClipboardOperation::Cut(vec![path]);
+            }
+        }
+
+        // Paste
+        (KeyCode::Char('p'), KeyModifiers::NONE) => {
+            crate::file_ops::paste(app)?;
+            app.load_directory()?;
+        }
+
+        // Search
+        (KeyCode::Char('/'), KeyModifiers::NONE) => {
+            app.mode = Mode::Search;
+            app.search_query.clear();
+        }
+
+        // Sort menu
+        (KeyCode::Char('o'), KeyModifiers::NONE) => {
+            app.mode = Mode::SortMenu;
+        }
+
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn handle_visual_mode(app: &mut App, key: KeyEvent) -> Result<()> {
+    match key.code {
+        KeyCode::Esc => {
+            app.mode = Mode::Normal;
+            app.selected_indices.clear();
+        }
+        KeyCode::Char('j') | KeyCode::Down => {
+            app.next();
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            app.previous();
+        }
+        KeyCode::Char('y') => {
+            // Copy selected
+            let paths: Vec<_> = app
+                .selected_indices
+                .iter()
+                .filter_map(|&i| app.files.get(i).map(|f| f.path.clone()))
+                .collect();
+            if !paths.is_empty() {
+                app.clipboard = ClipboardOperation::Copy(paths);
+            }
+            app.mode = Mode::Normal;
+            app.selected_indices.clear();
+        }
+        KeyCode::Char('x') => {
+            // Cut selected
+            let paths: Vec<_> = app
+                .selected_indices
+                .iter()
+                .filter_map(|&i| app.files.get(i).map(|f| f.path.clone()))
+                .collect();
+            if !paths.is_empty() {
+                app.clipboard = ClipboardOperation::Cut(paths);
+            }
+            app.mode = Mode::Normal;
+            app.selected_indices.clear();
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn handle_visual_multi_mode(app: &mut App, key: KeyEvent) -> Result<()> {
+    match key.code {
+        KeyCode::Esc => {
+            app.mode = Mode::Normal;
+            app.selected_indices.clear();
+        }
+        KeyCode::Char('j') | KeyCode::Down => {
+            app.next();
+            if let Some(selected) = app.list_state.selected() {
+                if !app.selected_indices.contains(&selected) {
+                    app.selected_indices.push(selected);
+                }
+            }
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            app.previous();
+            if let Some(selected) = app.list_state.selected() {
+                if !app.selected_indices.contains(&selected) {
+                    app.selected_indices.push(selected);
+                }
+            }
+        }
+        KeyCode::Char('y') => {
+            // Copy all selected
+            let paths: Vec<_> = app
+                .selected_indices
+                .iter()
+                .filter_map(|&i| app.files.get(i).map(|f| f.path.clone()))
+                .collect();
+            if !paths.is_empty() {
+                app.clipboard = ClipboardOperation::Copy(paths);
+            }
+            app.mode = Mode::Normal;
+            app.selected_indices.clear();
+        }
+        KeyCode::Char('x') => {
+            // Cut all selected
+            let paths: Vec<_> = app
+                .selected_indices
+                .iter()
+                .filter_map(|&i| app.files.get(i).map(|f| f.path.clone()))
+                .collect();
+            if !paths.is_empty() {
+                app.clipboard = ClipboardOperation::Cut(paths);
+            }
+            app.mode = Mode::Normal;
+            app.selected_indices.clear();
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn handle_search_mode(app: &mut App, key: KeyEvent) -> Result<()> {
+    match key.code {
+        KeyCode::Esc => {
+            app.mode = Mode::Normal;
+            app.search_query.clear();
+            app.update_filtered_indices();
+        }
+        KeyCode::Enter => {
+            app.mode = Mode::Normal;
+        }
+        KeyCode::Backspace => {
+            app.search_query.pop();
+            crate::fuzzy::update_search(app);
+        }
+        KeyCode::Char(c) => {
+            app.search_query.push(c);
+            crate::fuzzy::update_search(app);
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn handle_sort_menu(app: &mut App, key: KeyEvent) -> Result<()> {
+    match key.code {
+        KeyCode::Esc => {
+            app.mode = Mode::Normal;
+        }
+        KeyCode::Char('n') => {
+            app.sort_mode = SortMode::Name;
+            app.sort_files();
+            app.mode = Mode::Normal;
+        }
+        KeyCode::Char('s') => {
+            app.sort_mode = SortMode::Size;
+            app.sort_files();
+            app.mode = Mode::Normal;
+        }
+        KeyCode::Char('m') => {
+            app.sort_mode = SortMode::Modified;
+            app.sort_files();
+            app.mode = Mode::Normal;
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn format_key(key: &KeyEvent) -> String {
+    match key.code {
+        KeyCode::Char(c) if key.modifiers.contains(KeyModifiers::SHIFT) => {
+            c.to_uppercase().to_string()
+        }
+        KeyCode::Char(c) => c.to_string(),
+        _ => String::new(),
+    }
+}
