@@ -40,6 +40,21 @@ Or with any other AUR helper:
 paru -S jumper-git
 ```
 
+**After installation**, add shell integration to your shell config:
+
+```bash
+# For Bash - add to ~/.bashrc
+echo 'source /usr/share/jumper/jumper.sh' >> ~/.bashrc
+
+# For Zsh - add to ~/.zshrc
+echo 'source /usr/share/jumper/jumper.sh' >> ~/.zshrc
+
+# For Fish - add to ~/.config/fish/config.fish
+echo 'source /usr/share/jumper/jumper.fish' >> ~/.config/fish/config.fish
+```
+
+Then reload your shell: `source ~/.bashrc`
+
 ### From Source
 
 ```bash
@@ -51,11 +66,28 @@ cd jumper
 cargo install --path .
 ```
 
+**After installation**, add shell integration to your shell config:
+
+```bash
+# For Bash - add to ~/.bashrc
+echo 'source ~/.local/share/jumper/shell/jumper.sh' >> ~/.bashrc
+
+# For Zsh - add to ~/.zshrc
+echo 'source ~/.local/share/jumper/shell/jumper.sh' >> ~/.zshrc
+
+# For Fish - add to ~/.config/fish/config.fish
+echo 'source ~/.local/share/jumper/shell/jumper.fish' >> ~/.config/fish/config.fish
+```
+
+Then reload your shell: `source ~/.bashrc`
+
 ### From crates.io (coming soon)
 
 ```bash
 cargo install jumper
 ```
+
+**After installation**, add shell integration (same as "From Source" above)
 
 ### Manual Installation
 
