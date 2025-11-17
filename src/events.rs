@@ -47,6 +47,7 @@ pub async fn handle_key_event(app: &mut App, key: KeyEvent) -> Result<()> {
 
     match app.mode {
         Mode::Normal => handle_normal_mode(app, key, &two_key_combo)?,
+        Mode::VisualMulti => handle_visual_multi_mode(app, key)?,
         Mode::Search => handle_search_mode(app, key)?,
         Mode::SortMenu => handle_sort_menu(app, key)?,
         Mode::Create => handle_create_mode(app, key)?,
@@ -157,6 +158,17 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Resu
                     app.selected_indices.remove(pos);
                 } else {
                     // Not marked, mark it
+                    app.selected_indices.push(selected);
+                }
+            }
+        }
+
+        // Visual Multi mode (Shift+V)
+        (KeyCode::Char('V'), KeyModifiers::SHIFT) => {
+            app.mode = Mode::VisualMulti;
+            if let Some(selected) = app.list_state.selected() {
+                // Start with current file selected
+                if !app.selected_indices.contains(&selected) {
                     app.selected_indices.push(selected);
                 }
             }
@@ -331,6 +343,71 @@ fn handle_sort_menu(app: &mut App, key: KeyEvent) -> Result<()> {
             app.sort_mode = SortMode::Modified;
             app.sort_files();
             app.mode = Mode::Normal;
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn handle_visual_multi_mode(app: &mut App, key: KeyEvent) -> Result<()> {
+    match key.code {
+        KeyCode::Esc => {
+            app.mode = Mode::Normal;
+            // Keep marks when exiting
+        }
+        KeyCode::Char('j') | KeyCode::Down => {
+            app.next();
+            if let Some(selected) = app.list_state.selected() {
+                // Add to selection if not already selected
+                if !app.selected_indices.contains(&selected) {
+                    app.selected_indices.push(selected);
+                }
+            }
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            app.previous();
+            if let Some(selected) = app.list_state.selected() {
+                // Add to selection if not already selected
+                if !app.selected_indices.contains(&selected) {
+                    app.selected_indices.push(selected);
+                }
+            }
+        }
+        KeyCode::Char('m') => {
+            // Deselect current file
+            if let Some(selected) = app.list_state.selected() {
+                if let Some(pos) = app.selected_indices.iter().position(|&i| i == selected) {
+                    app.selected_indices.remove(pos);
+                }
+            }
+        }
+        KeyCode::Char('y') => {
+            // Copy all selected
+            let paths: Vec<_> = app
+                .selected_indices
+                .iter()
+                .filter_map(|&i| app.files.get(i).map(|f| f.path.clone()))
+                .collect();
+            if !paths.is_empty() {
+                app.flash_copied_paths = paths.clone();
+                app.clipboard = ClipboardOperation::Copy(paths);
+            }
+            app.mode = Mode::Normal;
+            app.selected_indices.clear();
+        }
+        KeyCode::Char('x') => {
+            // Cut all selected
+            let paths: Vec<_> = app
+                .selected_indices
+                .iter()
+                .filter_map(|&i| app.files.get(i).map(|f| f.path.clone()))
+                .collect();
+            if !paths.is_empty() {
+                app.clipboard = ClipboardOperation::Cut(paths);
+            }
+            app.mode = Mode::Normal;
+            app.selected_indices.clear();
         }
         _ => {}
     }

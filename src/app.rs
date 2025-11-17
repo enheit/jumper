@@ -29,6 +29,7 @@ pub enum ClipboardOperation {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Mode {
     Normal,
+    VisualMulti,
     Search,
     SortMenu,
     Create,

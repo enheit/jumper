@@ -199,6 +199,18 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
                 display_path
             }
         }
+        Mode::VisualMulti => {
+            let right_info = "Multi-Select: j/k=add m=remove y=copy x=cut ESC=exit";
+            let total_len = display_path.len() + right_info.len();
+            let available_width = area.width as usize;
+
+            if total_len < available_width {
+                let padding = available_width.saturating_sub(total_len);
+                format!("{}{}{}", display_path, " ".repeat(padding), right_info)
+            } else {
+                display_path
+            }
+        }
         Mode::Search => format!("Search: {}", app.search_query),
         Mode::SortMenu => {
             let right_info = "Sort: [n]ame [s]ize [m]odified ESC=cancel";
@@ -259,6 +271,14 @@ fn render_help(frame: &mut Frame, app: &App, area: Rect) {
             Line::from("   y       - Copy all marked files"),
             Line::from("   x       - Cut all marked files"),
             Line::from("   d       - Delete all marked files"),
+            Line::from(""),
+            Line::from(" Multi-Select (Shift+V):"),
+            Line::from("   V       - Enter multi-select mode"),
+            Line::from("   j/k     - Navigate and auto-add to selection"),
+            Line::from("   m       - Remove current file from selection"),
+            Line::from("   y       - Copy selection and exit"),
+            Line::from("   x       - Cut selection and exit"),
+            Line::from("   ESC     - Exit (keep marks)"),
             Line::from(""),
             Line::from(" Other:"),
             Line::from("   /       - Search (fuzzy)"),
