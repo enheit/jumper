@@ -6,6 +6,7 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::time::SystemTime;
+use tokio::sync::mpsc;
 
 #[derive(Debug, Clone)]
 pub struct FileEntry {
@@ -55,7 +56,7 @@ pub struct App {
     pub search_query: String,
     pub create_input: String,
     pub filtered_indices: Vec<usize>,
-    pub selected_indices: Vec<usize>,
+    pub selected_paths: Vec<PathBuf>,
     pub should_quit: bool,
     pub config: Config,
     pub last_key: String,
@@ -66,6 +67,9 @@ pub struct App {
     pub search_match_positions: HashMap<usize, Vec<usize>>, // file index -> character positions
     pub error_message: Option<String>,
     pub global_history: Vec<NavigationHistory>, // Global navigation history for Ctrl+O
+    pub dir_sizes: HashMap<PathBuf, Option<u64>>, // None means still calculating
+    pub dir_size_rx: mpsc::UnboundedReceiver<(PathBuf, u64)>,
+    pub dir_size_tx: mpsc::UnboundedSender<(PathBuf, u64)>,
 }
 
 impl App {
@@ -73,6 +77,8 @@ impl App {
         let current_dir = std::env::current_dir()?;
         let show_hidden = config.behavior.show_hidden;
         let sort_mode = config.behavior.default_sort.clone();
+
+        let (dir_size_tx, dir_size_rx) = mpsc::unbounded_channel();
 
         let mut app = Self {
             current_dir: current_dir.clone(),
@@ -86,7 +92,7 @@ impl App {
             search_query: String::new(),
             create_input: String::new(),
             filtered_indices: Vec::new(),
-            selected_indices: Vec::new(),
+            selected_paths: Vec::new(),
             should_quit: false,
             config,
             last_key: String::new(),
@@ -97,6 +103,9 @@ impl App {
             search_match_positions: HashMap::new(),
             error_message: None,
             global_history: Vec::new(),
+            dir_sizes: HashMap::new(),
+            dir_size_rx,
+            dir_size_tx,
         };
 
         app.load_directory()?;
@@ -106,6 +115,7 @@ impl App {
 
     pub fn load_directory(&mut self) -> Result<()> {
         self.files.clear();
+        self.dir_sizes.clear(); // Clear old directory sizes
 
         // Read directory entries
         for entry in fs::read_dir(&self.current_dir)? {
@@ -125,21 +135,51 @@ impl App {
                 false
             };
 
+            let is_dir = metadata.is_dir();
+
             self.files.push(FileEntry {
                 name: name.clone(),
                 path: path.clone(),
-                is_dir: metadata.is_dir(),
+                is_dir,
                 is_hidden,
                 is_symlink: metadata.is_symlink(),
-                is_executable: !metadata.is_dir() && is_executable,
+                is_executable: !is_dir && is_executable,
                 size: metadata.len(),
                 modified: metadata.modified().ok(),
             });
+
+            // Mark directories for size calculation
+            if is_dir {
+                self.dir_sizes.insert(path, None);
+            }
         }
 
         self.sort_files();
         self.update_filtered_indices();
         Ok(())
+    }
+
+    pub fn start_dir_size_calculation(&self) {
+        // Get all directories that need size calculation
+        let dirs_to_calculate: Vec<PathBuf> = self.dir_sizes
+            .iter()
+            .filter_map(|(path, size)| if size.is_none() { Some(path.clone()) } else { None })
+            .collect();
+
+        for dir_path in dirs_to_calculate {
+            let tx = self.dir_size_tx.clone();
+            tokio::spawn(async move {
+                let size = calculate_dir_size_sync(&dir_path);
+                let _ = tx.send((dir_path, size));
+            });
+        }
+    }
+
+    pub fn check_dir_size_updates(&mut self) {
+        // Process all available directory size updates
+        while let Ok((path, size)) = self.dir_size_rx.try_recv() {
+            self.dir_sizes.insert(path, Some(size));
+        }
     }
 
     pub fn sort_files(&mut self) {
@@ -367,4 +407,22 @@ impl App {
         self.search_highlights.clear();
         self.search_match_positions.clear();
     }
+}
+
+fn calculate_dir_size_sync(path: &PathBuf) -> u64 {
+    let mut total = 0;
+
+    if let Ok(entries) = fs::read_dir(path) {
+        for entry in entries.flatten() {
+            if let Ok(metadata) = entry.metadata() {
+                if metadata.is_file() {
+                    total += metadata.len();
+                } else if metadata.is_dir() {
+                    total += calculate_dir_size_sync(&entry.path());
+                }
+            }
+        }
+    }
+
+    total
 }

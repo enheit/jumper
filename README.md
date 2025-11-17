@@ -63,51 +63,38 @@ Download the latest release from [GitHub Releases](https://github.com/enheit/jum
 
 ### Shell Integration (Required for Directory Navigation)
 
-For `jumper` to change your shell's directory when you quit, add this function to your shell config:
+For `jumper` to change your shell's directory when you quit, source the shell integration script.
 
-**Bash** (`~/.bashrc`):
+The install script automatically copies integration scripts to `~/.local/share/jumper/shell/`.
+
+**Bash** - Add to `~/.bashrc`:
 ```bash
-j() {
-    jumper "$@"
-    if [ -f "$HOME/.cache/jumper/lastdir" ]; then
-        cd "$(cat "$HOME/.cache/jumper/lastdir")" || return
-    fi
-}
+source ~/.local/share/jumper/shell/jumper.sh
 ```
 
-**Zsh** (`~/.zshrc`):
+**Zsh** - Add to `~/.zshrc`:
 ```zsh
-j() {
-    jumper "$@"
-    if [ -f "$HOME/.cache/jumper/lastdir" ]; then
-        cd "$(cat "$HOME/.cache/jumper/lastdir")" || return
-    fi
-}
+source ~/.local/share/jumper/shell/jumper.sh
 ```
 
-**Fish** (`~/.config/fish/config.fish`):
+**Fish** - Add to `~/.config/fish/config.fish`:
 ```fish
-function j
-    jumper $argv
-    if test -f "$HOME/.cache/jumper/lastdir"
-        cd (cat "$HOME/.cache/jumper/lastdir")
-    end
-end
+source ~/.local/share/jumper/shell/jumper.fish
 ```
 
 Then reload your shell:
 ```bash
-source ~/.bashrc  # or ~/.zshrc or ~/.config/fish/config.fish
+source ~/.bashrc  # or ~/.zshrc
 ```
 
-After setup, use `j` instead of `jumper` to navigate and have your shell follow your location.
+After setup, `jumper` will automatically change your shell's directory when you quit!
 
 ## Usage
 
-Run `jumper` (or `j` with shell integration) in your terminal:
+Simply run `jumper` in your terminal:
 
 ```bash
-j
+jumper
 ```
 
 ## Keybindings

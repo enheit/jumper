@@ -113,29 +113,42 @@ else
     echo -e "${GREEN}$INSTALL_DIR is already in your PATH${NC}"
 fi
 
+# Install shell integration scripts
+SHELL_DIR="$HOME/.local/share/jumper/shell"
+mkdir -p "$SHELL_DIR"
+
+# Determine script location
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -d "$SCRIPT_DIR/shell" ]; then
+    # Installing from source
+    cp "$SCRIPT_DIR/shell/jumper.sh" "$SHELL_DIR/jumper.sh"
+    cp "$SCRIPT_DIR/shell/jumper.fish" "$SHELL_DIR/jumper.fish"
+else
+    # Download shell integration scripts
+    curl -sL "https://raw.githubusercontent.com/$REPO/main/shell/jumper.sh" -o "$SHELL_DIR/jumper.sh"
+    curl -sL "https://raw.githubusercontent.com/$REPO/main/shell/jumper.fish" -o "$SHELL_DIR/jumper.fish"
+fi
+
 echo ""
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${YELLOW}  IMPORTANT: Shell Integration Required${NC}"
+echo -e "${YELLOW}  Shell Integration (Required)${NC}"
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo "To enable directory navigation on exit, add this function to your shell config:"
+echo "Shell integration scripts installed to: $SHELL_DIR"
 echo ""
-echo -e "${GREEN}# For Bash (~/.bashrc) or Zsh (~/.zshrc):${NC}"
+echo "Add ONE of these lines to your shell config:"
 echo ""
-echo 'j() {'
-echo '    jumper "$@"'
-echo '    if [ -f "$HOME/.cache/jumper/lastdir" ]; then'
-echo '        cd "$(cat "$HOME/.cache/jumper/lastdir")" || return'
-echo '    fi'
-echo '}'
+echo -e "${GREEN}Bash (~/.bashrc):${NC}"
+echo "  source $SHELL_DIR/jumper.sh"
 echo ""
-echo "Then reload your shell:"
-echo "  source ~/.bashrc  # for Bash"
-echo "  source ~/.zshrc  # for Zsh"
+echo -e "${GREEN}Zsh (~/.zshrc):${NC}"
+echo "  source $SHELL_DIR/jumper.sh"
 echo ""
-echo "After setup, use 'j' instead of 'jumper' to navigate and change directories."
+echo -e "${GREEN}Fish (~/.config/fish/config.fish):${NC}"
+echo "  source $SHELL_DIR/jumper.fish"
+echo ""
+echo "Then reload your shell or run: source ~/.bashrc (or ~/.zshrc)"
 echo ""
 echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo "Run 'jumper' or 'j' to start the file manager"
-echo "Run 'jumper --help' for more information"
+echo "After setup, run 'jumper' - it will automatically cd on exit!"

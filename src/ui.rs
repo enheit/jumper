@@ -29,12 +29,26 @@ pub fn render_ui(frame: &mut Frame, app: &App) {
 
 fn render_file_list(frame: &mut Frame, app: &App, area: Rect) {
     let current_idx = app.list_state.selected();
+
+    // Check if directory is empty
+    if app.files.is_empty() {
+        let empty_text = Line::from(Span::styled(
+            "empty",
+            Style::default()
+                .fg(ratatui::style::Color::DarkGray)
+                .add_modifier(Modifier::ITALIC)
+        ));
+        let paragraph = ratatui::widgets::Paragraph::new(empty_text);
+        frame.render_widget(paragraph, area);
+        return;
+    }
+
     let items: Vec<ListItem> = app.files
         .iter()
         .enumerate()
         .map(|(idx, file)| {
             let is_cursor = current_idx == Some(idx);
-            let is_selected = app.selected_indices.contains(&idx);
+            let is_selected = app.selected_paths.contains(&file.path);
             let is_highlighted = app.search_highlights.contains(&idx);
             let is_flashing = app.flash_copied_paths.contains(&file.path);
             let match_positions = app.search_match_positions.get(&idx);
@@ -89,6 +103,11 @@ fn create_list_item<'a>(
 
     let mut base_style = Style::default().fg(color);
 
+    // Make directories bold
+    if file.is_dir {
+        base_style = base_style.add_modifier(Modifier::BOLD);
+    }
+
     // Flash effect for copied files (yellow background) - takes precedence
     if is_flashing {
         base_style = base_style
@@ -104,9 +123,11 @@ fn create_list_item<'a>(
             .add_modifier(Modifier::BOLD);
     }
 
-    // Add italic for cut files (unless flashing)
+    // Add italic and dim for cut files (unless flashing)
     if is_cut && !is_flashing {
-        base_style = base_style.add_modifier(Modifier::ITALIC);
+        base_style = base_style
+            .add_modifier(Modifier::ITALIC)
+            .add_modifier(Modifier::DIM);
     }
 
     // Marked files (reversed)
@@ -115,7 +136,11 @@ fn create_list_item<'a>(
     }
 
     let size_str = if file.is_dir {
-        String::from("DIR")
+        // Check if we have the calculated size for this directory
+        match app.dir_sizes.get(&file.path) {
+            Some(Some(size)) => format_size(*size),
+            Some(None) | None => String::from("? B"), // Still calculating
+        }
     } else {
         format_size(file.size)
     };
@@ -251,45 +276,45 @@ fn render_help(frame: &mut Frame, app: &App, area: Rect) {
     let help_text = match app.mode {
         Mode::Help => vec![
             Line::from(""),
-            Line::from(" Jumper - Keyboard Shortcuts").bold(),
+            Line::from("Jumper - Keyboard Shortcuts").bold(),
             Line::from(""),
-            Line::from(" Navigation:"),
-            Line::from("   j/↓     - Move down"),
-            Line::from("   k/↑     - Move up"),
-            Line::from("   h/←     - Go to parent directory"),
-            Line::from("   l/→     - Enter directory / Open file"),
+            Line::from("Navigation:"),
+            Line::from("  j/↓     - Move down"),
+            Line::from("  k/↑     - Move up"),
+            Line::from("  h/←     - Go to parent directory"),
+            Line::from("  l/→     - Enter directory / Open file"),
             Line::from(""),
-            Line::from(" File Operations:"),
-            Line::from("   a       - Create file/folder"),
-            Line::from("   yy      - Copy current file"),
-            Line::from("   x       - Cut current file"),
-            Line::from("   p       - Paste"),
-            Line::from("   d       - Delete file/folder"),
+            Line::from("File Operations:"),
+            Line::from("  a       - Create file/folder"),
+            Line::from("  yy      - Copy current file"),
+            Line::from("  x       - Cut current file"),
+            Line::from("  p       - Paste"),
+            Line::from("  d       - Delete file/folder"),
             Line::from(""),
-            Line::from(" Marking:"),
-            Line::from("   m       - Toggle mark on current file"),
-            Line::from("   y       - Copy all marked files"),
-            Line::from("   x       - Cut all marked files"),
-            Line::from("   d       - Delete all marked files"),
+            Line::from("Marking:"),
+            Line::from("  m       - Toggle mark on current file"),
+            Line::from("  y       - Copy all marked files"),
+            Line::from("  x       - Cut all marked files"),
+            Line::from("  d       - Delete all marked files"),
             Line::from(""),
-            Line::from(" Multi-Select (Shift+V):"),
-            Line::from("   V       - Enter multi-select mode"),
-            Line::from("   j/k     - Navigate and auto-add to selection"),
-            Line::from("   m       - Remove current file from selection"),
-            Line::from("   y       - Copy selection and exit"),
-            Line::from("   x       - Cut selection and exit"),
-            Line::from("   ENTER   - Exit and keep marks"),
-            Line::from("   ESC     - Exit and clear all marks"),
+            Line::from("Multi-Select (Shift+V):"),
+            Line::from("  V       - Enter multi-select mode"),
+            Line::from("  j/k     - Navigate and auto-add to selection"),
+            Line::from("  m       - Remove current file from selection"),
+            Line::from("  y       - Copy selection and exit"),
+            Line::from("  x       - Cut selection and exit"),
+            Line::from("  ENTER   - Exit and keep marks"),
+            Line::from("  ESC     - Exit and clear all marks"),
             Line::from(""),
-            Line::from(" Other:"),
-            Line::from("   /       - Search (fuzzy)"),
-            Line::from("   .       - Toggle hidden files"),
-            Line::from("   s       - Sort menu"),
-            Line::from("   o       - Toggle sort order (↑/↓)"),
-            Line::from("   ?       - Show this help"),
-            Line::from("   q       - Quit"),
+            Line::from("Other:"),
+            Line::from("  /       - Search (fuzzy)"),
+            Line::from("  .       - Toggle hidden files"),
+            Line::from("  s       - Sort menu"),
+            Line::from("  o       - Toggle sort order (↑/↓)"),
+            Line::from("  ?       - Show this help"),
+            Line::from("  q       - Quit"),
             Line::from(""),
-            Line::from(" Press ESC to return").bold(),
+            Line::from("Press ESC to return").bold(),
         ],
         _ => vec![],
     };
@@ -316,3 +341,4 @@ fn format_size(size: u64) -> String {
         format!("{} B", size)
     }
 }
+
