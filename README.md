@@ -148,6 +148,8 @@ jumper
 | Key | Action |
 |-----|--------|
 | `a` | Create new file/folder |
+| `r` | Rename (cursor before extension) |
+| `R` | Rename (cursor at end, with extension) |
 | `yy` | Copy current file |
 | `y` | Copy marked files |
 | `x` | Cut current/marked files |

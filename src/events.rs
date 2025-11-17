@@ -51,6 +51,7 @@ pub async fn handle_key_event(app: &mut App, key: KeyEvent) -> Result<()> {
         Mode::Search => handle_search_mode(app, key)?,
         Mode::SortMenu => handle_sort_menu(app, key)?,
         Mode::Create => handle_create_mode(app, key)?,
+        Mode::Rename => handle_rename_mode(app, key)?,
         Mode::Help => handle_help_mode(app, key)?,
         Mode::DeleteConfirm => handle_delete_confirm_mode(app, key)?,
     }
@@ -261,6 +262,47 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Resu
         (KeyCode::Char('a'), KeyModifiers::NONE) => {
             app.mode = Mode::Create;
             app.create_input.clear();
+        }
+
+        // Rename (r = without extension, R = with extension)
+        (KeyCode::Char('r'), KeyModifiers::NONE) => {
+            if let Some(path) = app.get_selected_path() {
+                let filename = path.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                // Find cursor position (before extension)
+                let cursor_pos = if let Some(dot_pos) = filename.rfind('.') {
+                    if dot_pos > 0 {
+                        dot_pos
+                    } else {
+                        filename.len()
+                    }
+                } else {
+                    filename.len()
+                };
+
+                app.rename_input = filename;
+                app.rename_cursor_pos = cursor_pos;
+                app.rename_target = Some(path);
+                app.mode = Mode::Rename;
+            }
+        }
+
+        (KeyCode::Char('R'), KeyModifiers::SHIFT) => {
+            if let Some(path) = app.get_selected_path() {
+                let filename = path.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                // Cursor at end (with extension)
+                app.rename_input = filename.clone();
+                app.rename_cursor_pos = filename.len();
+                app.rename_target = Some(path);
+                app.mode = Mode::Rename;
+            }
         }
 
         // Delete
@@ -559,6 +601,75 @@ fn handle_create_mode(app: &mut App, key: KeyEvent) -> Result<()> {
         }
         KeyCode::Char(c) => {
             app.create_input.push(c);
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn handle_rename_mode(app: &mut App, key: KeyEvent) -> Result<()> {
+    match key.code {
+        KeyCode::Esc => {
+            app.mode = Mode::Normal;
+            app.rename_input.clear();
+            app.rename_target = None;
+        }
+        KeyCode::Enter => {
+            if !app.rename_input.is_empty() {
+                if let Some(old_path) = &app.rename_target {
+                    let new_path = app.current_dir.join(&app.rename_input);
+
+                    // Don't rename if the name hasn't changed
+                    if old_path != &new_path {
+                        if let Err(e) = std::fs::rename(old_path, &new_path) {
+                            app.error_message = Some(format!("Failed to rename: {}", e));
+                        } else {
+                            app.load_directory()?;
+                            app.start_dir_size_calculation();
+
+                            // Select the renamed file
+                            if let Some(idx) = app.files.iter().position(|f| f.path == new_path) {
+                                app.list_state.select(Some(idx));
+                            }
+                        }
+                    }
+                }
+            }
+            app.mode = Mode::Normal;
+            app.rename_input.clear();
+            app.rename_target = None;
+        }
+        KeyCode::Backspace => {
+            if app.rename_cursor_pos > 0 {
+                app.rename_input.remove(app.rename_cursor_pos - 1);
+                app.rename_cursor_pos -= 1;
+            }
+        }
+        KeyCode::Delete => {
+            if app.rename_cursor_pos < app.rename_input.len() {
+                app.rename_input.remove(app.rename_cursor_pos);
+            }
+        }
+        KeyCode::Left => {
+            if app.rename_cursor_pos > 0 {
+                app.rename_cursor_pos -= 1;
+            }
+        }
+        KeyCode::Right => {
+            if app.rename_cursor_pos < app.rename_input.len() {
+                app.rename_cursor_pos += 1;
+            }
+        }
+        KeyCode::Home => {
+            app.rename_cursor_pos = 0;
+        }
+        KeyCode::End => {
+            app.rename_cursor_pos = app.rename_input.len();
+        }
+        KeyCode::Char(c) => {
+            app.rename_input.insert(app.rename_cursor_pos, c);
+            app.rename_cursor_pos += 1;
         }
         _ => {}
     }
