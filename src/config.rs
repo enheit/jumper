@@ -46,6 +46,8 @@ pub struct Behavior {
     pub default_sort: SortMode,
     #[serde(default = "default_delete_confirmation")]
     pub delete_confirmation: bool,
+    #[serde(default = "default_flash_duration_ms")]
+    pub flash_duration_ms: u64,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
@@ -89,6 +91,10 @@ fn default_delete_confirmation() -> bool {
     true
 }
 
+fn default_flash_duration_ms() -> u64 {
+    150
+}
+
 impl Default for ColorScheme {
     fn default() -> Self {
         Self {
@@ -126,6 +132,7 @@ impl Default for Behavior {
             show_hidden: false,
             default_sort: default_sort(),
             delete_confirmation: default_delete_confirmation(),
+            flash_duration_ms: default_flash_duration_ms(),
         }
     }
 }

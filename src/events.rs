@@ -33,9 +33,21 @@ pub async fn handle_key_event(app: &mut App, key: KeyEvent) -> Result<()> {
 fn handle_normal_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Result<()> {
     // Handle quick jumps (two-key combinations)
     if let Some(path) = app.config.keybindings.quick_jumps.get(two_key_combo) {
-        app.current_dir = std::path::PathBuf::from(path);
-        app.load_directory()?;
-        app.list_state.select(Some(0));
+        let path_buf = std::path::PathBuf::from(path);
+
+        // Check if the path exists
+        if path_buf.exists() && path_buf.is_dir() {
+            app.current_dir = path_buf;
+            if let Err(e) = app.load_directory() {
+                app.error_message = Some(format!("Error loading directory: {}", e));
+            } else {
+                app.list_state.select(Some(0));
+                app.error_message = None;
+            }
+        } else {
+            app.error_message = Some(format!("Path does not exist: {}", path));
+        }
+
         app.last_key.clear();
         return Ok(());
     }
@@ -49,22 +61,36 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Resu
         // Navigation
         (KeyCode::Char('j'), KeyModifiers::NONE) | (KeyCode::Down, _) => {
             app.next();
+            app.error_message = None;
         }
         (KeyCode::Char('k'), KeyModifiers::NONE) | (KeyCode::Up, _) => {
             app.previous();
+            app.error_message = None;
         }
         (KeyCode::Char('l'), KeyModifiers::NONE) | (KeyCode::Right, _) => {
             if let Some(path) = app.get_selected_path() {
                 if path.is_dir() {
-                    app.enter_directory()?;
+                    if let Err(e) = app.enter_directory() {
+                        app.error_message = Some(format!("Error entering directory: {}", e));
+                    } else {
+                        app.error_message = None;
+                    }
                 } else {
                     // Open file with default application
-                    crate::file_ops::open_file(&path)?;
+                    if let Err(e) = crate::file_ops::open_file(&path) {
+                        app.error_message = Some(format!("Error opening file: {}", e));
+                    } else {
+                        app.error_message = None;
+                    }
                 }
             }
         }
         (KeyCode::Char('h'), KeyModifiers::NONE) | (KeyCode::Left, _) => {
-            app.go_parent()?;
+            if let Err(e) = app.go_parent() {
+                app.error_message = Some(format!("Error going to parent: {}", e));
+            } else {
+                app.error_message = None;
+            }
         }
 
         // Toggle hidden files
@@ -264,6 +290,7 @@ fn handle_search_mode(app: &mut App, key: KeyEvent) -> Result<()> {
             app.mode = Mode::Normal;
             app.search_query.clear();
             app.search_highlights.clear();
+            app.search_match_positions.clear();
         }
         KeyCode::Enter => {
             app.mode = Mode::Normal;

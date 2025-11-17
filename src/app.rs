@@ -1,6 +1,7 @@
 use crate::config::{Config, SortMode};
 use anyhow::Result;
 use ratatui::widgets::ListState;
+use std::collections::HashMap;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
@@ -62,6 +63,8 @@ pub struct App {
     pub flash_copied_paths: Vec<PathBuf>,
     pub delete_target: Option<PathBuf>,
     pub search_highlights: Vec<usize>,
+    pub search_match_positions: HashMap<usize, Vec<usize>>, // file index -> character positions
+    pub error_message: Option<String>,
 }
 
 impl App {
@@ -89,6 +92,8 @@ impl App {
             flash_copied_paths: Vec::new(),
             delete_target: None,
             search_highlights: Vec::new(),
+            search_match_positions: HashMap::new(),
+            error_message: None,
         };
 
         app.load_directory()?;

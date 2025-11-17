@@ -5,20 +5,21 @@ use fuzzy_matcher::FuzzyMatcher;
 pub fn update_search(app: &mut App) {
     if app.search_query.is_empty() {
         app.search_highlights.clear();
+        app.search_match_positions.clear();
         return;
     }
 
     let matcher = SkimMatcherV2::default();
-    let matching_indices: Vec<usize> = app
-        .files
-        .iter()
-        .enumerate()
-        .filter_map(|(i, file)| {
-            matcher
-                .fuzzy_match(&file.name, &app.search_query)
-                .map(|_score| i)
-        })
-        .collect();
+    let mut matching_indices = Vec::new();
+
+    app.search_match_positions.clear();
+
+    for (i, file) in app.files.iter().enumerate() {
+        if let Some((_score, positions)) = matcher.fuzzy_indices(&file.name, &app.search_query) {
+            matching_indices.push(i);
+            app.search_match_positions.insert(i, positions);
+        }
+    }
 
     app.search_highlights = matching_indices;
 

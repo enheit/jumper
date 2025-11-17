@@ -57,19 +57,35 @@ async fn run_app<B: ratatui::backend::Backend>(
 ) -> Result<()> {
     let mut render_interval = interval(Duration::from_millis(16)); // ~60 FPS
     let mut flash_timer: Option<tokio::time::Instant> = None;
+    let mut error_timer: Option<tokio::time::Instant> = None;
 
     loop {
         // Clear flash copied paths after timeout
         if let Some(timer) = flash_timer {
-            if timer.elapsed() >= Duration::from_millis(800) {
+            if timer.elapsed() >= Duration::from_millis(app.config.behavior.flash_duration_ms) {
                 app.flash_copied_paths.clear();
                 flash_timer = None;
+            }
+        }
+
+        // Clear error message after 3 seconds
+        if let Some(timer) = error_timer {
+            if timer.elapsed() >= Duration::from_millis(3000) {
+                app.error_message = None;
+                error_timer = None;
             }
         }
 
         // Set timer when flash copied paths is shown
         if !app.flash_copied_paths.is_empty() && flash_timer.is_none() {
             flash_timer = Some(tokio::time::Instant::now());
+        }
+
+        // Set timer when error message is shown
+        if app.error_message.is_some() && error_timer.is_none() {
+            error_timer = Some(tokio::time::Instant::now());
+        } else if app.error_message.is_none() {
+            error_timer = None;
         }
 
         // Draw UI

@@ -3,7 +3,7 @@ use crate::config::SortMode;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style, Stylize},
-    text::Line,
+    text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph},
     Frame,
 };
@@ -28,25 +28,23 @@ pub fn render_ui(frame: &mut Frame, app: &App) {
 }
 
 fn render_file_list(frame: &mut Frame, app: &App, area: Rect) {
+    let current_idx = app.list_state.selected();
     let items: Vec<ListItem> = app.files
         .iter()
         .enumerate()
         .map(|(idx, file)| {
+            let is_cursor = current_idx == Some(idx);
             let is_selected = app.selected_indices.contains(&idx);
             let is_highlighted = app.search_highlights.contains(&idx);
             let is_flashing = app.flash_copied_paths.contains(&file.path);
-            create_list_item(file, is_selected, is_highlighted, is_flashing, app)
+            let match_positions = app.search_match_positions.get(&idx);
+            create_list_item(file, is_cursor, is_selected, is_highlighted, is_flashing, match_positions, app)
         })
         .collect();
 
     let list = List::new(items)
         .block(Block::default().borders(Borders::NONE))
-        .highlight_style(
-            Style::default()
-                .bg(app.config.colors.selected)
-                .fg(ratatui::style::Color::Black)
-                .add_modifier(Modifier::BOLD),
-        )
+        .highlight_style(Style::default()) // Empty style - we handle selection in create_list_item
         .highlight_symbol("");
 
     frame.render_stateful_widget(list, area, &mut app.list_state.clone());
@@ -54,9 +52,11 @@ fn render_file_list(frame: &mut Frame, app: &App, area: Rect) {
 
 fn create_list_item<'a>(
     file: &'a FileEntry,
+    is_cursor: bool,
     is_selected: bool,
-    is_highlighted: bool,
+    _is_highlighted: bool,
     is_flashing: bool,
+    match_positions: Option<&Vec<usize>>,
     app: &App
 ) -> ListItem<'a> {
     let icon = if file.is_dir {
@@ -87,25 +87,31 @@ fn create_list_item<'a>(
         app.config.colors.file
     };
 
-    let mut style = Style::default().fg(color);
+    let mut base_style = Style::default().fg(color);
 
-    // Flash effect for copied files (yellow background)
+    // Flash effect for copied files (yellow background) - takes precedence
     if is_flashing {
-        style = style.bg(ratatui::style::Color::Yellow).fg(ratatui::style::Color::Black);
+        base_style = base_style
+            .bg(ratatui::style::Color::LightYellow)
+            .fg(ratatui::style::Color::Black)
+            .add_modifier(Modifier::BOLD);
+    }
+    // Cursor position (green background)
+    else if is_cursor {
+        base_style = base_style
+            .bg(app.config.colors.selected)
+            .fg(ratatui::style::Color::Black)
+            .add_modifier(Modifier::BOLD);
     }
 
-    // Highlight search matches
-    if is_highlighted && !is_flashing {
-        style = style.bg(ratatui::style::Color::DarkGray);
+    // Add italic for cut files (unless flashing)
+    if is_cut && !is_flashing {
+        base_style = base_style.add_modifier(Modifier::ITALIC);
     }
 
-    // Add italic for cut files
-    if is_cut {
-        style = style.add_modifier(Modifier::ITALIC);
-    }
-
-    if is_selected {
-        style = style.add_modifier(Modifier::REVERSED);
+    // Visual mode selection (reversed)
+    if is_selected && !is_flashing && !is_cursor {
+        base_style = base_style.add_modifier(Modifier::REVERSED);
     }
 
     let size_str = if file.is_dir {
@@ -114,12 +120,48 @@ fn create_list_item<'a>(
         format_size(file.size)
     };
 
-    let content = format!("{} {:<40} {:>10}", icon, file.name, size_str);
-    ListItem::new(content).style(style)
+    // Build the content with character-level highlighting for search matches
+    let mut spans = vec![Span::styled(format!("{} ", icon), base_style)];
+
+    // Render filename with character highlighting if there are match positions
+    if let Some(positions) = match_positions {
+        let chars: Vec<char> = file.name.chars().collect();
+
+        for (char_idx, ch) in chars.iter().enumerate() {
+            let mut char_style = base_style;
+
+            // Check if this character position is a match
+            if positions.contains(&char_idx) {
+                // Highlight matched character in yellow
+                char_style = char_style.fg(ratatui::style::Color::Yellow).add_modifier(Modifier::BOLD);
+            }
+
+            spans.push(Span::styled(ch.to_string(), char_style));
+        }
+
+        // Add padding to maintain alignment
+        let padding_len = 40_usize.saturating_sub(file.name.len());
+        if padding_len > 0 {
+            spans.push(Span::styled(" ".repeat(padding_len), base_style));
+        }
+    } else {
+        // No search highlighting - render normally with padding
+        spans.push(Span::styled(format!("{:<40}", file.name), base_style));
+    }
+
+    // Add size info
+    spans.push(Span::styled(format!(" {:>10}", size_str), base_style));
+
+    ListItem::new(Line::from(spans))
 }
 
 fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
-    let current_path = app.current_dir.to_string_lossy().to_string();
+    // Show error message if present, otherwise show current path
+    let display_path = if let Some(ref error) = app.error_message {
+        format!("Error: {}", error)
+    } else {
+        app.current_dir.to_string_lossy().to_string()
+    };
 
     let footer_text = match app.mode {
         Mode::Normal => {
@@ -136,23 +178,23 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
             };
 
             format!("{:<width$}Sort: {}{}",
-                current_path,
+                display_path,
                 sort_info,
                 clipboard_info,
                 width = area.width.saturating_sub(30) as usize
             )
         }
         Mode::Visual => format!("{:<width$}Visual: y=copy x=cut ESC=cancel",
-            current_path,
+            display_path,
             width = area.width.saturating_sub(35) as usize
         ),
         Mode::VisualMulti => format!("{:<width$}Visual Multi: y=copy x=cut ESC=cancel",
-            current_path,
+            display_path,
             width = area.width.saturating_sub(40) as usize
         ),
         Mode::Search => format!("Search: {}", app.search_query),
         Mode::SortMenu => format!("{:<width$}Sort: [n]ame [s]ize [m]odified ESC=cancel",
-            current_path,
+            display_path,
             width = area.width.saturating_sub(45) as usize
         ),
         Mode::Create => format!("Create (end with / for folder): {}", app.create_input),
