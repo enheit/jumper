@@ -163,6 +163,7 @@ jumper
 | `m` | Remove current file from selection |
 | `y` | Copy selection and exit |
 | `x` | Cut selection and exit |
+| `d` | Delete selection |
 | `Enter` | Exit and keep marks |
 | `ESC` | Exit and clear all marks |
 

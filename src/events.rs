@@ -424,6 +424,24 @@ fn handle_visual_multi_mode(app: &mut App, key: KeyEvent) -> Result<()> {
             app.mode = Mode::Normal;
             app.selected_paths.clear();
         }
+        KeyCode::Char('d') => {
+            // Delete all selected
+            let paths_to_delete = app.selected_paths.clone();
+            if !paths_to_delete.is_empty() {
+                if app.config.behavior.delete_confirmation {
+                    app.delete_targets = paths_to_delete;
+                    app.mode = Mode::DeleteConfirm;
+                } else {
+                    for path in &paths_to_delete {
+                        crate::file_ops::delete_path(path)?;
+                    }
+                    app.selected_paths.clear();
+                    app.load_directory()?;
+                    app.start_dir_size_calculation();
+                    app.mode = Mode::Normal;
+                }
+            }
+        }
         _ => {}
     }
 
