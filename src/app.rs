@@ -32,6 +32,14 @@ pub enum Mode {
     VisualMulti,
     Search,
     SortMenu,
+    Create,
+    Help,
+}
+
+#[derive(Debug, Clone)]
+pub struct NavigationHistory {
+    pub path: PathBuf,
+    pub selected_index: usize,
 }
 
 pub struct App {
@@ -43,11 +51,13 @@ pub struct App {
     pub show_hidden: bool,
     pub sort_mode: SortMode,
     pub search_query: String,
+    pub create_input: String,
     pub filtered_indices: Vec<usize>,
     pub selected_indices: Vec<usize>,
     pub should_quit: bool,
     pub config: Config,
     pub last_key: String,
+    pub nav_history: Vec<NavigationHistory>,
 }
 
 impl App {
@@ -65,11 +75,13 @@ impl App {
             show_hidden,
             sort_mode,
             search_query: String::new(),
+            create_input: String::new(),
             filtered_indices: Vec::new(),
             selected_indices: Vec::new(),
             should_quit: false,
             config,
             last_key: String::new(),
+            nav_history: Vec::new(),
         };
 
         app.load_directory()?;
@@ -201,23 +213,70 @@ impl App {
 
     pub fn enter_directory(&mut self) -> Result<()> {
         if let Some(selected) = self.list_state.selected() {
-            let files = self.get_filtered_files();
-            if let Some(file) = files.get(selected) {
-                if file.is_dir {
-                    self.current_dir = file.path.clone();
-                    self.load_directory()?;
-                    self.list_state.select(Some(0));
+            let next_path = {
+                let files = self.get_filtered_files();
+                if let Some(file) = files.get(selected) {
+                    if file.is_dir {
+                        Some(file.path.clone())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
                 }
+            };
+
+            if let Some(next_path) = next_path {
+                // Save current position to history
+                self.nav_history.push(NavigationHistory {
+                    path: self.current_dir.clone(),
+                    selected_index: selected,
+                });
+
+                self.current_dir = next_path;
+                self.load_directory()?;
+                self.list_state.select(Some(0));
             }
         }
         Ok(())
     }
 
     pub fn go_parent(&mut self) -> Result<()> {
-        if let Some(parent) = self.current_dir.parent() {
+        // Try to restore from history first
+        if let Some(hist) = self.nav_history.pop() {
+            self.current_dir = hist.path.clone();
+            self.load_directory()?;
+
+            // Find the folder we came from and select it
+            let target_index = self.files.iter().position(|f| {
+                self.current_dir.join(&f.name) == self.nav_history.last()
+                    .map(|h| h.path.clone())
+                    .unwrap_or_else(|| {
+                        // If history is empty, find the folder that matches our previous dir
+                        if let Some(parent) = self.current_dir.parent() {
+                            parent.join(self.current_dir.file_name().unwrap_or_default())
+                        } else {
+                            self.current_dir.clone()
+                        }
+                    })
+            }).unwrap_or(hist.selected_index.min(self.files.len().saturating_sub(1)));
+
+            self.list_state.select(Some(target_index));
+        } else if let Some(parent) = self.current_dir.parent() {
+            let old_dir_name = self.current_dir.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("")
+                .to_string();
+
             self.current_dir = parent.to_path_buf();
             self.load_directory()?;
-            self.list_state.select(Some(0));
+
+            // Find and select the directory we just came from
+            let target_index = self.files.iter()
+                .position(|f| f.name == old_dir_name)
+                .unwrap_or(0);
+
+            self.list_state.select(Some(target_index));
         }
         Ok(())
     }

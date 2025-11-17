@@ -1,6 +1,7 @@
 use crate::app::{App, ClipboardOperation};
 use anyhow::Result;
 use fs_extra::dir;
+use std::fs;
 use std::path::Path;
 
 pub fn open_file(path: &Path) -> Result<()> {
@@ -64,5 +65,15 @@ fn move_items(sources: &[std::path::PathBuf], dest: &Path) -> Result<()> {
         }
     }
 
+    Ok(())
+}
+
+pub fn create_file(path: &Path) -> Result<()> {
+    fs::File::create(path)?;
+    Ok(())
+}
+
+pub fn create_directory(path: &Path) -> Result<()> {
+    fs::create_dir_all(path)?;
     Ok(())
 }

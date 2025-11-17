@@ -19,6 +19,8 @@ pub async fn handle_key_event(app: &mut App, key: KeyEvent) -> Result<()> {
         Mode::VisualMulti => handle_visual_multi_mode(app, key)?,
         Mode::Search => handle_search_mode(app, key)?,
         Mode::SortMenu => handle_sort_menu(app, key)?,
+        Mode::Create => handle_create_mode(app, key)?,
+        Mode::Help => handle_help_mode(app, key)?,
     }
 
     // Update last key
@@ -115,6 +117,17 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Resu
         // Sort menu
         (KeyCode::Char('o'), KeyModifiers::NONE) => {
             app.mode = Mode::SortMenu;
+        }
+
+        // Create file/folder
+        (KeyCode::Char('a'), KeyModifiers::NONE) => {
+            app.mode = Mode::Create;
+            app.create_input.clear();
+        }
+
+        // Help
+        (KeyCode::Char('?'), KeyModifiers::SHIFT) => {
+            app.mode = Mode::Help;
         }
 
         _ => {}
@@ -263,6 +276,52 @@ fn handle_sort_menu(app: &mut App, key: KeyEvent) -> Result<()> {
         KeyCode::Char('m') => {
             app.sort_mode = SortMode::Modified;
             app.sort_files();
+            app.mode = Mode::Normal;
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn handle_create_mode(app: &mut App, key: KeyEvent) -> Result<()> {
+    match key.code {
+        KeyCode::Esc => {
+            app.mode = Mode::Normal;
+            app.create_input.clear();
+        }
+        KeyCode::Enter => {
+            if !app.create_input.is_empty() {
+                let path = app.current_dir.join(&app.create_input);
+
+                if app.create_input.ends_with('/') {
+                    // Create directory
+                    crate::file_ops::create_directory(&path)?;
+                } else {
+                    // Create file
+                    crate::file_ops::create_file(&path)?;
+                }
+
+                app.load_directory()?;
+            }
+            app.mode = Mode::Normal;
+            app.create_input.clear();
+        }
+        KeyCode::Backspace => {
+            app.create_input.pop();
+        }
+        KeyCode::Char(c) => {
+            app.create_input.push(c);
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn handle_help_mode(app: &mut App, key: KeyEvent) -> Result<()> {
+    match key.code {
+        KeyCode::Esc | KeyCode::Char('?') => {
             app.mode = Mode::Normal;
         }
         _ => {}
