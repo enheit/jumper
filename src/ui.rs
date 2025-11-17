@@ -109,7 +109,7 @@ fn create_list_item<'a>(
         base_style = base_style.add_modifier(Modifier::ITALIC);
     }
 
-    // Visual mode selection (reversed)
+    // Marked files (reversed)
     if is_selected && !is_flashing && !is_cursor {
         base_style = base_style.add_modifier(Modifier::REVERSED);
     }
@@ -199,30 +199,6 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
                 display_path
             }
         }
-        Mode::Visual => {
-            let right_info = "Visual: y=copy x=cut ESC=cancel";
-            let total_len = display_path.len() + right_info.len();
-            let available_width = area.width as usize;
-
-            if total_len < available_width {
-                let padding = available_width.saturating_sub(total_len);
-                format!("{}{}{}", display_path, " ".repeat(padding), right_info)
-            } else {
-                display_path
-            }
-        }
-        Mode::VisualMulti => {
-            let right_info = "Visual Multi: y=copy x=cut ESC=cancel";
-            let total_len = display_path.len() + right_info.len();
-            let available_width = area.width as usize;
-
-            if total_len < available_width {
-                let padding = available_width.saturating_sub(total_len);
-                format!("{}{}{}", display_path, " ".repeat(padding), right_info)
-            } else {
-                display_path
-            }
-        }
         Mode::Search => format!("Search: {}", app.search_query),
         Mode::SortMenu => {
             let right_info = "Sort: [n]ame [s]ize [m]odified ESC=cancel";
@@ -239,10 +215,15 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         Mode::Create => format!("Create (end with / for folder): {}", app.create_input),
         Mode::Help => String::from("Press ESC or ? to close help"),
         Mode::DeleteConfirm => {
-            if let Some(path) = &app.delete_target {
-                format!("Delete {}? [y/N]", path.file_name().unwrap_or_default().to_string_lossy())
+            let count = app.delete_targets.len();
+            if count == 1 {
+                if let Some(path) = app.delete_targets.first() {
+                    format!("Delete {}? [y/N]", path.file_name().unwrap_or_default().to_string_lossy())
+                } else {
+                    String::from("Delete? [y/N]")
+                }
             } else {
-                String::from("Delete? [y/N]")
+                format!("Delete {} items? [y/N]", count)
             }
         }
     };
@@ -268,20 +249,22 @@ fn render_help(frame: &mut Frame, app: &App, area: Rect) {
             Line::from(""),
             Line::from(" File Operations:"),
             Line::from("   a       - Create file/folder"),
-            Line::from("   yy      - Copy file/folder"),
-            Line::from("   x       - Cut file/folder"),
+            Line::from("   yy      - Copy current file"),
+            Line::from("   x       - Cut current file"),
             Line::from("   p       - Paste"),
+            Line::from("   d       - Delete file/folder"),
             Line::from(""),
-            Line::from(" Selection:"),
-            Line::from("   v       - Visual mode (single select)"),
-            Line::from("   V       - Visual multi-select"),
+            Line::from(" Marking:"),
+            Line::from("   m       - Toggle mark on current file"),
+            Line::from("   y       - Copy all marked files"),
+            Line::from("   x       - Cut all marked files"),
+            Line::from("   d       - Delete all marked files"),
             Line::from(""),
             Line::from(" Other:"),
             Line::from("   /       - Search (fuzzy)"),
             Line::from("   .       - Toggle hidden files"),
             Line::from("   s       - Sort menu"),
             Line::from("   o       - Toggle sort order (↑/↓)"),
-            Line::from("   d       - Delete file/folder"),
             Line::from("   ?       - Show this help"),
             Line::from("   q       - Quit"),
             Line::from(""),

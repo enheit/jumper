@@ -47,8 +47,6 @@ pub async fn handle_key_event(app: &mut App, key: KeyEvent) -> Result<()> {
 
     match app.mode {
         Mode::Normal => handle_normal_mode(app, key, &two_key_combo)?,
-        Mode::Visual => handle_visual_mode(app, key)?,
-        Mode::VisualMulti => handle_visual_multi_mode(app, key)?,
         Mode::Search => handle_search_mode(app, key)?,
         Mode::SortMenu => handle_sort_menu(app, key)?,
         Mode::Create => handle_create_mode(app, key)?,
@@ -150,34 +148,61 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Resu
             app.toggle_hidden()?;
         }
 
-        // Visual mode
-        (KeyCode::Char('v'), KeyModifiers::NONE) => {
-            app.mode = Mode::Visual;
+        // Mark toggle
+        (KeyCode::Char('m'), KeyModifiers::NONE) => {
             if let Some(selected) = app.list_state.selected() {
-                app.selected_indices = vec![selected];
-            }
-        }
-        (KeyCode::Char('V'), KeyModifiers::SHIFT) => {
-            app.mode = Mode::VisualMulti;
-            if let Some(selected) = app.list_state.selected() {
-                app.selected_indices = vec![selected];
+                // Toggle mark on current file
+                if let Some(pos) = app.selected_indices.iter().position(|&i| i == selected) {
+                    // Already marked, unmark it
+                    app.selected_indices.remove(pos);
+                } else {
+                    // Not marked, mark it
+                    app.selected_indices.push(selected);
+                }
             }
         }
 
-        // Copy (yy)
+        // Copy (yy or y on marked files)
         (KeyCode::Char('y'), KeyModifiers::NONE) => {
             if app.last_key == "y" {
-                if let Some(path) = app.get_selected_path() {
-                    app.flash_copied_paths = vec![path.clone()];
-                    app.clipboard = ClipboardOperation::Copy(vec![path]);
+                // yy: copy current file if no marks
+                if app.selected_indices.is_empty() {
+                    if let Some(path) = app.get_selected_path() {
+                        app.flash_copied_paths = vec![path.clone()];
+                        app.clipboard = ClipboardOperation::Copy(vec![path]);
+                    }
                 }
                 app.last_key.clear();
+            } else if !app.selected_indices.is_empty() {
+                // y: copy all marked files
+                let paths: Vec<_> = app
+                    .selected_indices
+                    .iter()
+                    .filter_map(|&i| app.files.get(i).map(|f| f.path.clone()))
+                    .collect();
+                if !paths.is_empty() {
+                    app.flash_copied_paths = paths.clone();
+                    app.clipboard = ClipboardOperation::Copy(paths);
+                    app.selected_indices.clear();
+                }
             }
         }
 
-        // Cut
+        // Cut (x on current or marked files)
         (KeyCode::Char('x'), KeyModifiers::NONE) => {
-            if let Some(path) = app.get_selected_path() {
+            if !app.selected_indices.is_empty() {
+                // Cut all marked files
+                let paths: Vec<_> = app
+                    .selected_indices
+                    .iter()
+                    .filter_map(|&i| app.files.get(i).map(|f| f.path.clone()))
+                    .collect();
+                if !paths.is_empty() {
+                    app.clipboard = ClipboardOperation::Cut(paths);
+                    app.selected_indices.clear();
+                }
+            } else if let Some(path) = app.get_selected_path() {
+                // Cut current file
                 app.clipboard = ClipboardOperation::Cut(vec![path]);
             }
         }
@@ -213,12 +238,29 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Resu
 
         // Delete
         (KeyCode::Char('d'), KeyModifiers::NONE) => {
-            if let Some(path) = app.get_selected_path() {
+            // Check if there are marked files (selected_indices)
+            let paths_to_delete: Vec<_> = if !app.selected_indices.is_empty() {
+                // Delete all marked files
+                app.selected_indices
+                    .iter()
+                    .filter_map(|&i| app.files.get(i).map(|f| f.path.clone()))
+                    .collect()
+            } else if let Some(path) = app.get_selected_path() {
+                // Delete current file
+                vec![path]
+            } else {
+                vec![]
+            };
+
+            if !paths_to_delete.is_empty() {
                 if app.config.behavior.delete_confirmation {
-                    app.delete_target = Some(path);
+                    app.delete_targets = paths_to_delete;
                     app.mode = Mode::DeleteConfirm;
                 } else {
-                    crate::file_ops::delete_path(&path)?;
+                    for path in &paths_to_delete {
+                        crate::file_ops::delete_path(path)?;
+                    }
+                    app.selected_indices.clear();
                     app.load_directory()?;
                 }
             }
@@ -240,106 +282,6 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Resu
             }
         }
 
-        _ => {}
-    }
-
-    Ok(())
-}
-
-fn handle_visual_mode(app: &mut App, key: KeyEvent) -> Result<()> {
-    match key.code {
-        KeyCode::Esc => {
-            app.mode = Mode::Normal;
-            app.selected_indices.clear();
-        }
-        KeyCode::Char('j') | KeyCode::Down => {
-            app.next();
-        }
-        KeyCode::Char('k') | KeyCode::Up => {
-            app.previous();
-        }
-        KeyCode::Char('y') => {
-            // Copy selected
-            let paths: Vec<_> = app
-                .selected_indices
-                .iter()
-                .filter_map(|&i| app.files.get(i).map(|f| f.path.clone()))
-                .collect();
-            if !paths.is_empty() {
-                app.flash_copied_paths = paths.clone();
-                app.clipboard = ClipboardOperation::Copy(paths);
-            }
-            app.mode = Mode::Normal;
-            app.selected_indices.clear();
-        }
-        KeyCode::Char('x') => {
-            // Cut selected
-            let paths: Vec<_> = app
-                .selected_indices
-                .iter()
-                .filter_map(|&i| app.files.get(i).map(|f| f.path.clone()))
-                .collect();
-            if !paths.is_empty() {
-                app.clipboard = ClipboardOperation::Cut(paths);
-            }
-            app.mode = Mode::Normal;
-            app.selected_indices.clear();
-        }
-        _ => {}
-    }
-
-    Ok(())
-}
-
-fn handle_visual_multi_mode(app: &mut App, key: KeyEvent) -> Result<()> {
-    match key.code {
-        KeyCode::Esc => {
-            app.mode = Mode::Normal;
-            app.selected_indices.clear();
-        }
-        KeyCode::Char('j') | KeyCode::Down => {
-            app.next();
-            if let Some(selected) = app.list_state.selected() {
-                if !app.selected_indices.contains(&selected) {
-                    app.selected_indices.push(selected);
-                }
-            }
-        }
-        KeyCode::Char('k') | KeyCode::Up => {
-            app.previous();
-            if let Some(selected) = app.list_state.selected() {
-                if !app.selected_indices.contains(&selected) {
-                    app.selected_indices.push(selected);
-                }
-            }
-        }
-        KeyCode::Char('y') => {
-            // Copy all selected
-            let paths: Vec<_> = app
-                .selected_indices
-                .iter()
-                .filter_map(|&i| app.files.get(i).map(|f| f.path.clone()))
-                .collect();
-            if !paths.is_empty() {
-                app.flash_copied_paths = paths.clone();
-                app.clipboard = ClipboardOperation::Copy(paths);
-            }
-            app.mode = Mode::Normal;
-            app.selected_indices.clear();
-        }
-        KeyCode::Char('x') => {
-            // Cut all selected
-            let paths: Vec<_> = app
-                .selected_indices
-                .iter()
-                .filter_map(|&i| app.files.get(i).map(|f| f.path.clone()))
-                .collect();
-            if !paths.is_empty() {
-                app.clipboard = ClipboardOperation::Cut(paths);
-            }
-            app.mode = Mode::Normal;
-            app.selected_indices.clear();
-        }
         _ => {}
     }
 
@@ -445,14 +387,16 @@ fn handle_help_mode(app: &mut App, key: KeyEvent) -> Result<()> {
 fn handle_delete_confirm_mode(app: &mut App, key: KeyEvent) -> Result<()> {
     match key.code {
         KeyCode::Char('y') | KeyCode::Char('Y') => {
-            if let Some(path) = app.delete_target.take() {
-                crate::file_ops::delete_path(&path)?;
-                app.load_directory()?;
+            for path in &app.delete_targets {
+                crate::file_ops::delete_path(path)?;
             }
+            app.delete_targets.clear();
+            app.selected_indices.clear();
+            app.load_directory()?;
             app.mode = Mode::Normal;
         }
         KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc | KeyCode::Enter => {
-            app.delete_target = None;
+            app.delete_targets.clear();
             app.mode = Mode::Normal;
         }
         _ => {}

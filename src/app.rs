@@ -29,8 +29,6 @@ pub enum ClipboardOperation {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Mode {
     Normal,
-    Visual,
-    VisualMulti,
     Search,
     SortMenu,
     Create,
@@ -62,7 +60,7 @@ pub struct App {
     pub last_key: String,
     pub nav_history: Vec<NavigationHistory>,
     pub flash_copied_paths: Vec<PathBuf>,
-    pub delete_target: Option<PathBuf>,
+    pub delete_targets: Vec<PathBuf>,
     pub search_highlights: Vec<usize>,
     pub search_match_positions: HashMap<usize, Vec<usize>>, // file index -> character positions
     pub error_message: Option<String>,
@@ -93,7 +91,7 @@ impl App {
             last_key: String::new(),
             nav_history: Vec::new(),
             flash_copied_paths: Vec::new(),
-            delete_target: None,
+            delete_targets: Vec::new(),
             search_highlights: Vec::new(),
             search_match_positions: HashMap::new(),
             error_message: None,
