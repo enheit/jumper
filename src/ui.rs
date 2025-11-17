@@ -250,12 +250,7 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
             }
         }
         Mode::Create => format!("Create (end with / for folder): {}", app.create_input),
-        Mode::Rename => {
-            // Show rename input with cursor
-            let before_cursor = &app.rename_input[..app.rename_cursor_pos];
-            let after_cursor = &app.rename_input[app.rename_cursor_pos..];
-            format!("Rename: {}|{}", before_cursor, after_cursor)
-        }
+        Mode::Rename => format!("Rename: {}", app.rename_input),
         Mode::Help => String::from("Press ESC or ? to close help"),
         Mode::DeleteConfirm => {
             let count = app.delete_targets.len();
