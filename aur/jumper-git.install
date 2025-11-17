@@ -1,0 +1,25 @@
+post_install() {
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  Jumper - Shell Integration Required"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo "To enable directory navigation on exit, add this to your shell config:"
+    echo ""
+    echo "Bash/Zsh (~/.bashrc or ~/.zshrc):"
+    echo "  source /usr/share/jumper/jumper.sh"
+    echo ""
+    echo "Fish (~/.config/fish/config.fish):"
+    echo "  source /usr/share/jumper/jumper.fish"
+    echo ""
+    echo "Then reload your shell or run: source ~/.bashrc"
+    echo ""
+    echo "After setup, use 'j' to start jumper with directory navigation."
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+}
+
+post_upgrade() {
+    post_install
+}
