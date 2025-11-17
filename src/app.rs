@@ -254,6 +254,8 @@ impl App {
                 self.current_dir = next_path;
                 self.load_directory()?;
                 self.list_state.select(Some(0));
+                // Clear search when entering directory
+                self.clear_search();
             }
         }
         Ok(())
@@ -288,6 +290,8 @@ impl App {
             }).unwrap_or(hist.selected_index.min(self.files.len().saturating_sub(1)));
 
             self.list_state.select(Some(target_index));
+            // Clear search when going to parent
+            self.clear_search();
         } else if let Some(parent) = self.current_dir.parent() {
             // Push current location to global history before navigating
             self.global_history.push(NavigationHistory {
@@ -309,6 +313,8 @@ impl App {
                 .unwrap_or(0);
 
             self.list_state.select(Some(target_index));
+            // Clear search when going to parent
+            self.clear_search();
         }
         Ok(())
     }
@@ -332,7 +338,15 @@ impl App {
             self.current_dir = hist.path;
             self.load_directory()?;
             self.list_state.select(Some(hist.selected_index.min(self.files.len().saturating_sub(1))));
+            // Clear search when navigating
+            self.clear_search();
         }
         Ok(())
+    }
+
+    pub fn clear_search(&mut self) {
+        self.search_query.clear();
+        self.search_highlights.clear();
+        self.search_match_positions.clear();
     }
 }

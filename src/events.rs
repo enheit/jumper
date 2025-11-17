@@ -93,6 +93,8 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Resu
             } else {
                 app.list_state.select(Some(0));
                 app.error_message = None;
+                // Clear search when jumping to different directory
+                app.clear_search();
             }
         } else {
             app.error_message = Some(format!("Path does not exist: {}", path));
@@ -228,8 +230,7 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Resu
             }
             // Clear search highlights if any
             if !app.search_highlights.is_empty() {
-                app.search_highlights.clear();
-                app.search_match_positions.clear();
+                app.clear_search();
             }
         }
 
@@ -343,9 +344,7 @@ fn handle_search_mode(app: &mut App, key: KeyEvent) -> Result<()> {
     match key.code {
         KeyCode::Esc => {
             app.mode = Mode::Normal;
-            app.search_query.clear();
-            app.search_highlights.clear();
-            app.search_match_positions.clear();
+            app.clear_search();
         }
         KeyCode::Enter => {
             app.mode = Mode::Normal;

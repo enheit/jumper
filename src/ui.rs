@@ -123,15 +123,22 @@ fn create_list_item<'a>(
     // Build the content with character-level highlighting for search matches
     let mut spans = vec![Span::styled(format!("{} ", icon), base_style)];
 
+    // Add trailing slash to directory names
+    let display_name = if file.is_dir {
+        format!("{}/", file.name)
+    } else {
+        file.name.clone()
+    };
+
     // Render filename with character highlighting if there are match positions
     if let Some(positions) = match_positions {
-        let chars: Vec<char> = file.name.chars().collect();
+        let chars: Vec<char> = display_name.chars().collect();
 
         for (char_idx, ch) in chars.iter().enumerate() {
             let mut char_style = base_style;
 
-            // Check if this character position is a match
-            if positions.contains(&char_idx) {
+            // Check if this character position is a match (only for actual filename chars, not the slash)
+            if char_idx < file.name.len() && positions.contains(&char_idx) {
                 // Highlight matched character in yellow
                 char_style = char_style.fg(ratatui::style::Color::Yellow).add_modifier(Modifier::BOLD);
             }
@@ -140,13 +147,13 @@ fn create_list_item<'a>(
         }
 
         // Add padding to maintain alignment
-        let padding_len = 40_usize.saturating_sub(file.name.len());
+        let padding_len = 40_usize.saturating_sub(display_name.len());
         if padding_len > 0 {
             spans.push(Span::styled(" ".repeat(padding_len), base_style));
         }
     } else {
         // No search highlighting - render normally with padding
-        spans.push(Span::styled(format!("{:<40}", file.name), base_style));
+        spans.push(Span::styled(format!("{:<40}", display_name), base_style));
     }
 
     // Add size info
