@@ -249,6 +249,9 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Resu
 
         // Delete
         (KeyCode::Char('d'), KeyModifiers::NONE) => {
+            // Store current position before deletion
+            let current_index = app.list_state.selected().unwrap_or(0);
+
             // Check if there are marked files (selected_paths)
             let paths_to_delete: Vec<_> = if !app.selected_paths.is_empty() {
                 // Delete all marked files
@@ -270,6 +273,19 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Resu
                     }
                     app.selected_paths.clear();
                     app.load_directory()?;
+
+                    // Restore cursor position intelligently
+                    let new_count = app.filtered_indices.len();
+                    if new_count > 0 {
+                        // Try to stay at same index, or move up if we're past the end
+                        let new_index = if current_index >= new_count {
+                            new_count - 1
+                        } else {
+                            current_index
+                        };
+                        app.list_state.select(Some(new_index));
+                    }
+
                     app.start_dir_size_calculation();
                 }
             }
@@ -432,11 +448,27 @@ fn handle_visual_multi_mode(app: &mut App, key: KeyEvent) -> Result<()> {
                     app.delete_targets = paths_to_delete;
                     app.mode = Mode::DeleteConfirm;
                 } else {
+                    // Store current position before deletion
+                    let current_index = app.list_state.selected().unwrap_or(0);
+
                     for path in &paths_to_delete {
                         crate::file_ops::delete_path(path)?;
                     }
                     app.selected_paths.clear();
                     app.load_directory()?;
+
+                    // Restore cursor position intelligently
+                    let new_count = app.filtered_indices.len();
+                    if new_count > 0 {
+                        // Try to stay at same index, or move up if we're past the end
+                        let new_index = if current_index >= new_count {
+                            new_count - 1
+                        } else {
+                            current_index
+                        };
+                        app.list_state.select(Some(new_index));
+                    }
+
                     app.start_dir_size_calculation();
                     app.mode = Mode::Normal;
                 }
@@ -498,12 +530,28 @@ fn handle_help_mode(app: &mut App, key: KeyEvent) -> Result<()> {
 fn handle_delete_confirm_mode(app: &mut App, key: KeyEvent) -> Result<()> {
     match key.code {
         KeyCode::Char('y') | KeyCode::Char('Y') => {
+            // Store current position before deletion
+            let current_index = app.list_state.selected().unwrap_or(0);
+
             for path in &app.delete_targets {
                 crate::file_ops::delete_path(path)?;
             }
             app.delete_targets.clear();
             app.selected_paths.clear();
             app.load_directory()?;
+
+            // Restore cursor position intelligently
+            let new_count = app.filtered_indices.len();
+            if new_count > 0 {
+                // Try to stay at same index, or move up if we're past the end
+                let new_index = if current_index >= new_count {
+                    new_count - 1
+                } else {
+                    current_index
+                };
+                app.list_state.select(Some(new_index));
+            }
+
             app.start_dir_size_calculation();
             app.mode = Mode::Normal;
         }
