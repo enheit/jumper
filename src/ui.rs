@@ -28,14 +28,14 @@ pub fn render_ui(frame: &mut Frame, app: &App) {
 }
 
 fn render_file_list(frame: &mut Frame, app: &App, area: Rect) {
-    let filtered_files = app.get_filtered_files();
-
-    let items: Vec<ListItem> = filtered_files
+    let items: Vec<ListItem> = app.files
         .iter()
         .enumerate()
         .map(|(idx, file)| {
             let is_selected = app.selected_indices.contains(&idx);
-            create_list_item(file, is_selected, app)
+            let is_highlighted = app.search_highlights.contains(&idx);
+            let is_flashing = app.flash_copied_paths.contains(&file.path);
+            create_list_item(file, is_selected, is_highlighted, is_flashing, app)
         })
         .collect();
 
@@ -52,7 +52,13 @@ fn render_file_list(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_stateful_widget(list, area, &mut app.list_state.clone());
 }
 
-fn create_list_item<'a>(file: &'a FileEntry, is_selected: bool, app: &App) -> ListItem<'a> {
+fn create_list_item<'a>(
+    file: &'a FileEntry,
+    is_selected: bool,
+    is_highlighted: bool,
+    is_flashing: bool,
+    app: &App
+) -> ListItem<'a> {
     let icon = if file.is_dir {
         ""
     } else if file.is_symlink {
@@ -82,6 +88,16 @@ fn create_list_item<'a>(file: &'a FileEntry, is_selected: bool, app: &App) -> Li
     };
 
     let mut style = Style::default().fg(color);
+
+    // Flash effect for copied files (yellow background)
+    if is_flashing {
+        style = style.bg(ratatui::style::Color::Yellow).fg(ratatui::style::Color::Black);
+    }
+
+    // Highlight search matches
+    if is_highlighted && !is_flashing {
+        style = style.bg(ratatui::style::Color::DarkGray);
+    }
 
     // Add italic for cut files
     if is_cut {
@@ -143,29 +159,16 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         Mode::Help => String::from("Press ESC or ? to close help"),
         Mode::DeleteConfirm => {
             if let Some(path) = &app.delete_target {
-                format!("Delete {}? [y/n]", path.file_name().unwrap_or_default().to_string_lossy())
+                format!("Delete {}? [y/N]", path.file_name().unwrap_or_default().to_string_lossy())
             } else {
-                String::from("Delete? [y/n]")
+                String::from("Delete? [y/N]")
             }
         }
     };
 
-    // Add flash notification if present
-    let final_text = if let Some(notification) = &app.flash_notification {
-        format!("{} | {}", footer_text, notification)
-    } else {
-        footer_text
-    };
-
-    let footer_style = if app.flash_notification.is_some() {
-        Style::default().fg(ratatui::style::Color::Yellow).add_modifier(Modifier::BOLD)
-    } else {
-        Style::default()
-    };
-
-    let footer = Paragraph::new(final_text)
+    let footer = Paragraph::new(footer_text)
         .block(Block::default().borders(Borders::NONE))
-        .style(footer_style);
+        .style(Style::default());
 
     frame.render_widget(footer, area);
 }

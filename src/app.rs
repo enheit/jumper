@@ -59,8 +59,9 @@ pub struct App {
     pub config: Config,
     pub last_key: String,
     pub nav_history: Vec<NavigationHistory>,
-    pub flash_notification: Option<String>,
+    pub flash_copied_paths: Vec<PathBuf>,
     pub delete_target: Option<PathBuf>,
+    pub search_highlights: Vec<usize>,
 }
 
 impl App {
@@ -85,8 +86,9 @@ impl App {
             config,
             last_key: String::new(),
             nav_history: Vec::new(),
-            flash_notification: None,
+            flash_copied_paths: Vec::new(),
             delete_target: None,
+            search_highlights: Vec::new(),
         };
 
         app.load_directory()?;

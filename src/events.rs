@@ -90,8 +90,8 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Resu
         (KeyCode::Char('y'), KeyModifiers::NONE) => {
             if app.last_key == "y" {
                 if let Some(path) = app.get_selected_path() {
+                    app.flash_copied_paths = vec![path.clone()];
                     app.clipboard = ClipboardOperation::Copy(vec![path]);
-                    app.flash_notification = Some("Copied".to_string());
                 }
                 app.last_key.clear();
             }
@@ -145,6 +145,13 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Resu
             app.mode = Mode::Help;
         }
 
+        // Esc - clear cut clipboard
+        (KeyCode::Esc, KeyModifiers::NONE) => {
+            if matches!(app.clipboard, ClipboardOperation::Cut(_)) {
+                app.clipboard = ClipboardOperation::None;
+            }
+        }
+
         _ => {}
     }
 
@@ -171,9 +178,8 @@ fn handle_visual_mode(app: &mut App, key: KeyEvent) -> Result<()> {
                 .filter_map(|&i| app.files.get(i).map(|f| f.path.clone()))
                 .collect();
             if !paths.is_empty() {
-                let count = paths.len();
+                app.flash_copied_paths = paths.clone();
                 app.clipboard = ClipboardOperation::Copy(paths);
-                app.flash_notification = Some(format!("Copied {} items", count));
             }
             app.mode = Mode::Normal;
             app.selected_indices.clear();
@@ -227,9 +233,8 @@ fn handle_visual_multi_mode(app: &mut App, key: KeyEvent) -> Result<()> {
                 .filter_map(|&i| app.files.get(i).map(|f| f.path.clone()))
                 .collect();
             if !paths.is_empty() {
-                let count = paths.len();
+                app.flash_copied_paths = paths.clone();
                 app.clipboard = ClipboardOperation::Copy(paths);
-                app.flash_notification = Some(format!("Copied {} items", count));
             }
             app.mode = Mode::Normal;
             app.selected_indices.clear();
@@ -258,10 +263,11 @@ fn handle_search_mode(app: &mut App, key: KeyEvent) -> Result<()> {
         KeyCode::Esc => {
             app.mode = Mode::Normal;
             app.search_query.clear();
-            app.update_filtered_indices();
+            app.search_highlights.clear();
         }
         KeyCode::Enter => {
             app.mode = Mode::Normal;
+            // Keep highlights active
         }
         KeyCode::Backspace => {
             app.search_query.pop();
@@ -358,7 +364,7 @@ fn handle_delete_confirm_mode(app: &mut App, key: KeyEvent) -> Result<()> {
             }
             app.mode = Mode::Normal;
         }
-        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc | KeyCode::Enter => {
             app.delete_target = None;
             app.mode = Mode::Normal;
         }

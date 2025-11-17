@@ -59,16 +59,16 @@ async fn run_app<B: ratatui::backend::Backend>(
     let mut flash_timer: Option<tokio::time::Instant> = None;
 
     loop {
-        // Clear flash notification after timeout
+        // Clear flash copied paths after timeout
         if let Some(timer) = flash_timer {
             if timer.elapsed() >= Duration::from_millis(800) {
-                app.flash_notification = None;
+                app.flash_copied_paths.clear();
                 flash_timer = None;
             }
         }
 
-        // Set timer when flash notification is shown
-        if app.flash_notification.is_some() && flash_timer.is_none() {
+        // Set timer when flash copied paths is shown
+        if !app.flash_copied_paths.is_empty() && flash_timer.is_none() {
             flash_timer = Some(tokio::time::Instant::now());
         }
 
