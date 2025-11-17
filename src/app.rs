@@ -65,6 +65,7 @@ pub struct App {
     pub search_highlights: Vec<usize>,
     pub search_match_positions: HashMap<usize, Vec<usize>>, // file index -> character positions
     pub error_message: Option<String>,
+    pub global_history: Vec<NavigationHistory>, // Global navigation history for Ctrl+O
 }
 
 impl App {
@@ -94,6 +95,7 @@ impl App {
             search_highlights: Vec::new(),
             search_match_positions: HashMap::new(),
             error_message: None,
+            global_history: Vec::new(),
         };
 
         app.load_directory()?;
@@ -239,8 +241,12 @@ impl App {
             };
 
             if let Some(next_path) = next_path {
-                // Save current position to history
+                // Save current position to both histories
                 self.nav_history.push(NavigationHistory {
+                    path: self.current_dir.clone(),
+                    selected_index: selected,
+                });
+                self.global_history.push(NavigationHistory {
                     path: self.current_dir.clone(),
                     selected_index: selected,
                 });
@@ -254,8 +260,16 @@ impl App {
     }
 
     pub fn go_parent(&mut self) -> Result<()> {
+        let current_selected = self.list_state.selected().unwrap_or(0);
+
         // Try to restore from history first
         if let Some(hist) = self.nav_history.pop() {
+            // Push current location to global history before navigating
+            self.global_history.push(NavigationHistory {
+                path: self.current_dir.clone(),
+                selected_index: current_selected,
+            });
+
             self.current_dir = hist.path.clone();
             self.load_directory()?;
 
@@ -275,6 +289,12 @@ impl App {
 
             self.list_state.select(Some(target_index));
         } else if let Some(parent) = self.current_dir.parent() {
+            // Push current location to global history before navigating
+            self.global_history.push(NavigationHistory {
+                path: self.current_dir.clone(),
+                selected_index: current_selected,
+            });
+
             let old_dir_name = self.current_dir.file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or("")
@@ -305,5 +325,14 @@ impl App {
                 .get(i)
                 .map(|f| f.path.clone())
         })
+    }
+
+    pub fn go_back_in_history(&mut self) -> Result<()> {
+        if let Some(hist) = self.global_history.pop() {
+            self.current_dir = hist.path;
+            self.load_directory()?;
+            self.list_state.select(Some(hist.selected_index.min(self.files.len().saturating_sub(1))));
+        }
+        Ok(())
     }
 }

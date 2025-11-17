@@ -36,6 +36,8 @@ pub struct ColorScheme {
 pub struct KeyBindings {
     #[serde(default)]
     pub quick_jumps: HashMap<String, String>,
+    #[serde(default = "default_history_back")]
+    pub history_back: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -95,6 +97,10 @@ fn default_flash_duration_ms() -> u64 {
     150
 }
 
+fn default_history_back() -> String {
+    "ctrl+o".to_string()
+}
+
 impl Default for ColorScheme {
     fn default() -> Self {
         Self {
@@ -122,7 +128,10 @@ impl Default for KeyBindings {
                 home.join("Projects").to_string_lossy().to_string(),
             );
         }
-        Self { quick_jumps }
+        Self {
+            quick_jumps,
+            history_back: default_history_back(),
+        }
     }
 }
 

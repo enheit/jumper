@@ -171,32 +171,62 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
                 SortMode::Modified => "Modified",
             };
 
-            let clipboard_info = match &app.clipboard {
-                ClipboardOperation::Copy(paths) => format!(" | Copied: {}", paths.len()),
-                ClipboardOperation::Cut(paths) => format!(" | Cut: {}", paths.len()),
-                ClipboardOperation::None => String::new(),
+            let right_info = match &app.clipboard {
+                ClipboardOperation::Copy(paths) => format!("Sort: {} | Copied: {}", sort_info, paths.len()),
+                ClipboardOperation::Cut(paths) => format!("Sort: {} | Cut: {}", sort_info, paths.len()),
+                ClipboardOperation::None => format!("Sort: {}", sort_info),
             };
 
-            format!("{:<width$}Sort: {}{}",
-                display_path,
-                sort_info,
-                clipboard_info,
-                width = area.width.saturating_sub(30) as usize
-            )
+            // Calculate padding needed between left and right sections
+            let total_len = display_path.len() + right_info.len();
+            let available_width = area.width as usize;
+
+            if total_len < available_width {
+                // Add padding between left and right
+                let padding = available_width.saturating_sub(total_len);
+                format!("{}{}{}", display_path, " ".repeat(padding), right_info)
+            } else {
+                // Not enough space, just show path and truncate if needed
+                display_path
+            }
         }
-        Mode::Visual => format!("{:<width$}Visual: y=copy x=cut ESC=cancel",
-            display_path,
-            width = area.width.saturating_sub(35) as usize
-        ),
-        Mode::VisualMulti => format!("{:<width$}Visual Multi: y=copy x=cut ESC=cancel",
-            display_path,
-            width = area.width.saturating_sub(40) as usize
-        ),
+        Mode::Visual => {
+            let right_info = "Visual: y=copy x=cut ESC=cancel";
+            let total_len = display_path.len() + right_info.len();
+            let available_width = area.width as usize;
+
+            if total_len < available_width {
+                let padding = available_width.saturating_sub(total_len);
+                format!("{}{}{}", display_path, " ".repeat(padding), right_info)
+            } else {
+                display_path
+            }
+        }
+        Mode::VisualMulti => {
+            let right_info = "Visual Multi: y=copy x=cut ESC=cancel";
+            let total_len = display_path.len() + right_info.len();
+            let available_width = area.width as usize;
+
+            if total_len < available_width {
+                let padding = available_width.saturating_sub(total_len);
+                format!("{}{}{}", display_path, " ".repeat(padding), right_info)
+            } else {
+                display_path
+            }
+        }
         Mode::Search => format!("Search: {}", app.search_query),
-        Mode::SortMenu => format!("{:<width$}Sort: [n]ame [s]ize [m]odified ESC=cancel",
-            display_path,
-            width = area.width.saturating_sub(45) as usize
-        ),
+        Mode::SortMenu => {
+            let right_info = "Sort: [n]ame [s]ize [m]odified ESC=cancel";
+            let total_len = display_path.len() + right_info.len();
+            let available_width = area.width as usize;
+
+            if total_len < available_width {
+                let padding = available_width.saturating_sub(total_len);
+                format!("{}{}{}", display_path, " ".repeat(padding), right_info)
+            } else {
+                display_path
+            }
+        }
         Mode::Create => format!("Create (end with / for folder): {}", app.create_input),
         Mode::Help => String::from("Press ESC or ? to close help"),
         Mode::DeleteConfirm => {

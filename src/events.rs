@@ -3,6 +3,38 @@ use crate::config::SortMode;
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
+fn matches_keybinding(key: &KeyEvent, binding: &str) -> bool {
+    let parts: Vec<&str> = binding.split('+').collect();
+
+    let mut has_ctrl = false;
+    let mut has_shift = false;
+    let mut has_alt = false;
+    let mut key_char = None;
+
+    for part in parts {
+        match part.to_lowercase().as_str() {
+            "ctrl" | "control" => has_ctrl = true,
+            "shift" => has_shift = true,
+            "alt" => has_alt = true,
+            c if c.len() == 1 => key_char = Some(c.chars().next().unwrap()),
+            _ => {}
+        }
+    }
+
+    if let Some(ch) = key_char {
+        if let KeyCode::Char(key_ch) = key.code {
+            let modifiers_match =
+                key.modifiers.contains(KeyModifiers::CONTROL) == has_ctrl &&
+                key.modifiers.contains(KeyModifiers::SHIFT) == has_shift &&
+                key.modifiers.contains(KeyModifiers::ALT) == has_alt;
+
+            return key_ch == ch && modifiers_match;
+        }
+    }
+
+    false
+}
+
 pub async fn handle_key_event(app: &mut App, key: KeyEvent) -> Result<()> {
     // Only handle Press events for consistency across platforms
     if key.kind != KeyEventKind::Press {
@@ -31,12 +63,30 @@ pub async fn handle_key_event(app: &mut App, key: KeyEvent) -> Result<()> {
 }
 
 fn handle_normal_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Result<()> {
+    // Check for history back keybinding first
+    if matches_keybinding(&key, &app.config.keybindings.history_back) {
+        if let Err(e) = app.go_back_in_history() {
+            app.error_message = Some(format!("Error going back in history: {}", e));
+        } else {
+            app.error_message = None;
+        }
+        return Ok(());
+    }
+
     // Handle quick jumps (two-key combinations)
     if let Some(path) = app.config.keybindings.quick_jumps.get(two_key_combo) {
         let path_buf = std::path::PathBuf::from(path);
 
         // Check if the path exists
         if path_buf.exists() && path_buf.is_dir() {
+            // Push current location to global history before jumping
+            if let Some(current_selected) = app.list_state.selected() {
+                app.global_history.push(crate::app::NavigationHistory {
+                    path: app.current_dir.clone(),
+                    selected_index: current_selected,
+                });
+            }
+
             app.current_dir = path_buf;
             if let Err(e) = app.load_directory() {
                 app.error_message = Some(format!("Error loading directory: {}", e));
@@ -171,10 +221,15 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Resu
             app.mode = Mode::Help;
         }
 
-        // Esc - clear cut clipboard
+        // Esc - clear cut clipboard and search highlights
         (KeyCode::Esc, KeyModifiers::NONE) => {
             if matches!(app.clipboard, ClipboardOperation::Cut(_)) {
                 app.clipboard = ClipboardOperation::None;
+            }
+            // Clear search highlights if any
+            if !app.search_highlights.is_empty() {
+                app.search_highlights.clear();
+                app.search_match_positions.clear();
             }
         }
 
