@@ -352,9 +352,14 @@ fn handle_sort_menu(app: &mut App, key: KeyEvent) -> Result<()> {
 
 fn handle_visual_multi_mode(app: &mut App, key: KeyEvent) -> Result<()> {
     match key.code {
-        KeyCode::Esc => {
+        KeyCode::Enter => {
+            // Exit mode and keep marks
             app.mode = Mode::Normal;
-            // Keep marks when exiting
+        }
+        KeyCode::Esc => {
+            // Exit mode and clear all marks
+            app.mode = Mode::Normal;
+            app.selected_indices.clear();
         }
         KeyCode::Char('j') | KeyCode::Down => {
             app.next();

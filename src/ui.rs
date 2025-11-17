@@ -200,7 +200,7 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
             }
         }
         Mode::VisualMulti => {
-            let right_info = "Multi-Select: j/k=add m=remove y=copy x=cut ESC=exit";
+            let right_info = "Multi-Select: j/k=add m=remove ENTER=keep ESC=clear";
             let total_len = display_path.len() + right_info.len();
             let available_width = area.width as usize;
 
@@ -278,7 +278,8 @@ fn render_help(frame: &mut Frame, app: &App, area: Rect) {
             Line::from("   m       - Remove current file from selection"),
             Line::from("   y       - Copy selection and exit"),
             Line::from("   x       - Cut selection and exit"),
-            Line::from("   ESC     - Exit (keep marks)"),
+            Line::from("   ENTER   - Exit and keep marks"),
+            Line::from("   ESC     - Exit and clear all marks"),
             Line::from(""),
             Line::from(" Other:"),
             Line::from("   /       - Search (fuzzy)"),
