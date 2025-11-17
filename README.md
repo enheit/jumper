@@ -5,16 +5,40 @@ A blazing fast terminal file manager with vim-like keybindings, built with Rust 
 ## Features
 
 - **Vim-like Navigation**: Navigate with hjkl or arrow keys
-- **Fuzzy Search**: Real-time fuzzy file searching with `/`
-- **File Operations**: Copy (yy), cut (x), and paste (p) files and directories
-- **Visual Selection**: Select single (v) or multiple files (Shift+V)
+- **Fuzzy Search**: Real-time fuzzy file searching with character-level highlighting
+- **File Operations**: Copy, cut, paste, delete, and create files/directories
+- **Mark System**: Mark multiple files with `m` and operate on them at once
+- **Multi-Select Mode**: Visual multi-select with `Shift+V` for range selection
 - **Quick Jumps**: Customizable shortcuts like `gh` (home), `gd` (downloads), `gp` (projects)
-- **Sorting**: Sort by name, size, or modified time with `o`
+- **Navigation History**: Go back with `Ctrl+O` through your navigation history
+- **Sorting**: Sort by name, size, or modified time (ascending/descending)
+- **Directory Sizes**: Async calculation of directory sizes with loading indicator
 - **Hidden Files**: Toggle hidden files visibility with `.`
+- **Visual Feedback**: Cut files shown dimmed, copied files flash yellow
 - **Customizable**: Colors, keybindings, and behaviors via TOML config
-- **Fast & Async**: Built with Tokio for non-blocking file operations
+- **Fast & Async**: Built with Tokio for non-blocking operations
 
 ## Installation
+
+### Quick Install (Linux/macOS)
+
+```bash
+curl -sSL https://raw.githubusercontent.com/enheit/jumper/main/install.sh | bash
+```
+
+This will download and install the latest release to `~/.local/bin/jumper`.
+
+### Arch Linux (AUR)
+
+```bash
+yay -S jumper-git
+```
+
+Or with any other AUR helper:
+
+```bash
+paru -S jumper-git
+```
 
 ### From Source
 
@@ -33,12 +57,57 @@ cargo install --path .
 cargo install jumper
 ```
 
+### Manual Installation
+
+Download the latest release from [GitHub Releases](https://github.com/enheit/jumper/releases) and extract it to a directory in your PATH.
+
+### Shell Integration (Required for Directory Navigation)
+
+For `jumper` to change your shell's directory when you quit, add this function to your shell config:
+
+**Bash** (`~/.bashrc`):
+```bash
+j() {
+    jumper "$@"
+    if [ -f "$HOME/.cache/jumper/lastdir" ]; then
+        cd "$(cat "$HOME/.cache/jumper/lastdir")" || return
+    fi
+}
+```
+
+**Zsh** (`~/.zshrc`):
+```zsh
+j() {
+    jumper "$@"
+    if [ -f "$HOME/.cache/jumper/lastdir" ]; then
+        cd "$(cat "$HOME/.cache/jumper/lastdir")" || return
+    fi
+}
+```
+
+**Fish** (`~/.config/fish/config.fish`):
+```fish
+function j
+    jumper $argv
+    if test -f "$HOME/.cache/jumper/lastdir"
+        cd (cat "$HOME/.cache/jumper/lastdir")
+    end
+end
+```
+
+Then reload your shell:
+```bash
+source ~/.bashrc  # or ~/.zshrc or ~/.config/fish/config.fish
+```
+
+After setup, use `j` instead of `jumper` to navigate and have your shell follow your location.
+
 ## Usage
 
-Simply run `jumper` in your terminal:
+Run `jumper` (or `j` with shell integration) in your terminal:
 
 ```bash
-jumper
+j
 ```
 
 ## Keybindings
@@ -50,26 +119,48 @@ jumper
 | `k` / `↑` | Move up |
 | `h` / `←` | Go to parent directory |
 | `l` / `→` | Enter directory / Open file |
+| `Ctrl+O` | Go back in navigation history |
 | `q` | Quit |
+| `?` | Show help |
 
 ### File Operations
 | Key | Action |
 |-----|--------|
-| `yy` | Copy file/directory |
-| `x` | Cut file/directory |
+| `a` | Create new file/folder |
+| `yy` | Copy current file |
+| `y` | Copy marked files |
+| `x` | Cut current/marked files |
 | `p` | Paste |
-| `v` | Visual mode (select single) |
-| `Shift+V` | Visual multi-select mode |
+| `d` | Delete current/marked files |
+| `m` | Toggle mark on current file |
+| `Shift+V` | Multi-select mode |
+| `ESC` | Clear marks/cut clipboard/search |
 
-### Other
+### Multi-Select Mode (Shift+V)
+| Key | Action |
+|-----|--------|
+| `j` / `↓` | Move down and expand selection |
+| `k` / `↑` | Move up and shrink selection |
+| `m` | Remove current file from selection |
+| `y` | Copy selection and exit |
+| `x` | Cut selection and exit |
+| `Enter` | Exit and keep marks |
+| `ESC` | Exit and clear all marks |
+
+### Search & Sort
 | Key | Action |
 |-----|--------|
 | `/` | Search (fuzzy) |
 | `.` | Toggle hidden files |
-| `o` | Sort menu |
-| `gh` | Go to home (configurable) |
-| `gd` | Go to downloads (configurable) |
-| `gp` | Go to projects (configurable) |
+| `s` | Open sort menu |
+| `o` | Toggle sort order (ascending/descending) |
+
+### Quick Jumps (Configurable)
+| Key | Default Location |
+|-----|-----------------|
+| `gh` | Home directory |
+| `gd` | Downloads |
+| `gp` | Projects |
 
 ## Configuration
 

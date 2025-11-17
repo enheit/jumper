@@ -14,6 +14,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use directories::BaseDirs;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use tokio::time::{interval, Duration};
@@ -36,6 +37,9 @@ async fn main() -> Result<()> {
     // Create app
     let mut app = App::new(config)?;
 
+    // Start directory size calculations
+    app.start_dir_size_calculation();
+
     // Run the app
     let result = run_app(&mut terminal, &mut app).await;
 
@@ -46,6 +50,19 @@ async fn main() -> Result<()> {
 
     if let Err(err) = result {
         eprintln!("Error: {}", err);
+    }
+
+    // Write current directory to temp file for shell integration
+    if let Some(base_dirs) = BaseDirs::new() {
+        let jumper_cache = base_dirs.cache_dir().join("jumper");
+        if let Err(e) = std::fs::create_dir_all(&jumper_cache) {
+            eprintln!("Warning: Could not create cache directory: {}", e);
+        } else {
+            let last_dir_file = jumper_cache.join("lastdir");
+            if let Err(e) = std::fs::write(&last_dir_file, app.current_dir.to_string_lossy().as_bytes()) {
+                eprintln!("Warning: Could not write lastdir file: {}", e);
+            }
+        }
     }
 
     Ok(())
@@ -87,6 +104,9 @@ async fn run_app<B: ratatui::backend::Backend>(
         } else if app.error_message.is_none() {
             error_timer = None;
         }
+
+        // Check for directory size updates
+        app.check_dir_size_updates();
 
         // Draw UI
         terminal.draw(|f| ui::render_ui(f, app))?;
