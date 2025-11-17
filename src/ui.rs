@@ -271,6 +271,23 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         .style(Style::default());
 
     frame.render_widget(footer, area);
+
+    // Set cursor position for rename and create modes
+    match app.mode {
+        Mode::Rename => {
+            // "Rename: " is 8 characters
+            let cursor_x = area.x + 8 + app.rename_cursor_pos as u16;
+            let cursor_y = area.y;
+            frame.set_cursor_position((cursor_x, cursor_y));
+        }
+        Mode::Create => {
+            // "Create (end with / for folder): " is 33 characters
+            let cursor_x = area.x + 33 + app.create_input.len() as u16;
+            let cursor_y = area.y;
+            frame.set_cursor_position((cursor_x, cursor_y));
+        }
+        _ => {}
+    }
 }
 
 fn render_help(frame: &mut Frame, app: &App, area: Rect) {
