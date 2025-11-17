@@ -47,7 +47,7 @@ pub async fn handle_key_event(app: &mut App, key: KeyEvent) -> Result<()> {
 
     match app.mode {
         Mode::Normal => handle_normal_mode(app, key, &two_key_combo)?,
-        Mode::VisualMulti => handle_visual_multi_mode(app, key)?,
+        Mode::VisualMulti => handle_visual_multi_mode(app, key, &two_key_combo)?,
         Mode::Search => handle_search_mode(app, key)?,
         Mode::SortMenu => handle_sort_menu(app, key)?,
         Mode::Create => handle_create_mode(app, key)?,
@@ -106,6 +106,13 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Resu
         return Ok(());
     }
 
+    // Handle gg (jump to top)
+    if two_key_combo == "gg" {
+        app.list_state.select(Some(0));
+        app.last_key.clear();
+        return Ok(());
+    }
+
     match (key.code, key.modifiers) {
         // Quit
         (KeyCode::Char('q'), KeyModifiers::NONE) => {
@@ -146,6 +153,15 @@ fn handle_normal_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Resu
             } else {
                 app.error_message = None;
                 app.start_dir_size_calculation();
+            }
+        }
+
+        // Jump to top (Shift+G for bottom is handled below)
+        (KeyCode::Char('G'), KeyModifiers::SHIFT) => {
+            // Jump to bottom
+            let count = app.filtered_indices.len();
+            if count > 0 {
+                app.list_state.select(Some(count - 1));
             }
         }
 
@@ -368,18 +384,52 @@ fn handle_sort_menu(app: &mut App, key: KeyEvent) -> Result<()> {
     Ok(())
 }
 
-fn handle_visual_multi_mode(app: &mut App, key: KeyEvent) -> Result<()> {
-    match key.code {
-        KeyCode::Enter => {
+fn handle_visual_multi_mode(app: &mut App, key: KeyEvent, two_key_combo: &str) -> Result<()> {
+    // Handle gg (jump to top and select all from current to top)
+    if two_key_combo == "gg" {
+        let current_index = app.list_state.selected().unwrap_or(0);
+        // Select all files from 0 to current position
+        for i in 0..=current_index {
+            if let Some(&file_idx) = app.filtered_indices.get(i) {
+                let path = app.files[file_idx].path.clone();
+                if !app.selected_paths.contains(&path) {
+                    app.selected_paths.push(path);
+                }
+            }
+        }
+        app.list_state.select(Some(0));
+        app.last_key.clear();
+        return Ok(());
+    }
+
+    match (key.code, key.modifiers) {
+        // Jump to bottom and select all
+        (KeyCode::Char('G'), KeyModifiers::SHIFT) => {
+            let current_index = app.list_state.selected().unwrap_or(0);
+            let count = app.filtered_indices.len();
+            if count > 0 {
+                // Select all files from current position to bottom
+                for i in current_index..count {
+                    if let Some(&file_idx) = app.filtered_indices.get(i) {
+                        let path = app.files[file_idx].path.clone();
+                        if !app.selected_paths.contains(&path) {
+                            app.selected_paths.push(path);
+                        }
+                    }
+                }
+                app.list_state.select(Some(count - 1));
+            }
+        }
+        (KeyCode::Enter, _) => {
             // Exit mode and keep marks
             app.mode = Mode::Normal;
         }
-        KeyCode::Esc => {
+        (KeyCode::Esc, _) => {
             // Exit mode and clear all marks
             app.mode = Mode::Normal;
             app.selected_paths.clear();
         }
-        KeyCode::Char('j') | KeyCode::Down => {
+        (KeyCode::Char('j'), _) | (KeyCode::Down, _) => {
             // Store current position before moving
             let prev_path = app.get_selected_path();
             app.next();
@@ -396,7 +446,7 @@ fn handle_visual_multi_mode(app: &mut App, key: KeyEvent) -> Result<()> {
                 }
             }
         }
-        KeyCode::Char('k') | KeyCode::Up => {
+        (KeyCode::Char('k'), _) | (KeyCode::Up, _) => {
             // Store current position before moving
             let prev_path = app.get_selected_path();
             app.previous();
@@ -413,7 +463,7 @@ fn handle_visual_multi_mode(app: &mut App, key: KeyEvent) -> Result<()> {
                 }
             }
         }
-        KeyCode::Char('m') => {
+        (KeyCode::Char('m'), _) => {
             // Deselect current file
             if let Some(path) = app.get_selected_path() {
                 if let Some(pos) = app.selected_paths.iter().position(|p| p == &path) {
@@ -421,7 +471,7 @@ fn handle_visual_multi_mode(app: &mut App, key: KeyEvent) -> Result<()> {
                 }
             }
         }
-        KeyCode::Char('y') => {
+        (KeyCode::Char('y'), _) => {
             // Copy all selected
             let paths = app.selected_paths.clone();
             if !paths.is_empty() {
@@ -431,7 +481,7 @@ fn handle_visual_multi_mode(app: &mut App, key: KeyEvent) -> Result<()> {
             app.mode = Mode::Normal;
             app.selected_paths.clear();
         }
-        KeyCode::Char('x') => {
+        (KeyCode::Char('x'), _) => {
             // Cut all selected
             let paths = app.selected_paths.clone();
             if !paths.is_empty() {
@@ -440,7 +490,7 @@ fn handle_visual_multi_mode(app: &mut App, key: KeyEvent) -> Result<()> {
             app.mode = Mode::Normal;
             app.selected_paths.clear();
         }
-        KeyCode::Char('d') => {
+        (KeyCode::Char('d'), _) => {
             // Delete all selected
             let paths_to_delete = app.selected_paths.clone();
             if !paths_to_delete.is_empty() {

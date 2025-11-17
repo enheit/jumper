@@ -138,6 +138,8 @@ jumper
 | `k` / `↑` | Move up |
 | `h` / `←` | Go to parent directory |
 | `l` / `→` | Enter directory / Open file |
+| `gg` | Jump to top |
+| `G` | Jump to bottom |
 | `Ctrl+O` | Go back in navigation history |
 | `q` | Quit |
 | `?` | Show help |
@@ -160,6 +162,8 @@ jumper
 |-----|--------|
 | `j` / `↓` | Move down and expand selection |
 | `k` / `↑` | Move up and shrink selection |
+| `gg` | Jump to top and select all to top |
+| `G` | Jump to bottom and select all to bottom |
 | `m` | Remove current file from selection |
 | `y` | Copy selection and exit |
 | `x` | Cut selection and exit |
