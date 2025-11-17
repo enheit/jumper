@@ -281,8 +281,8 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
             frame.set_cursor_position((cursor_x, cursor_y));
         }
         Mode::Create => {
-            // "Create (end with / for folder): " is 33 characters
-            let cursor_x = area.x + 33 + app.create_input.len() as u16;
+            // "Create (end with / for folder): " is 32 characters
+            let cursor_x = area.x + 32 + app.create_input.len() as u16;
             let cursor_y = area.y;
             frame.set_cursor_position((cursor_x, cursor_y));
         }
